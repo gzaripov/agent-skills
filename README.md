@@ -9,7 +9,7 @@ Each skill is self-contained, portable across tools, and installable individuall
 | Skill | Status | What it does |
 | --- | --- | --- |
 | [`babysit-pr`](./skills/babysit-pr) | Shipped | Watches an open PR until it's merge-ready — resolves bot review comments, fixes failing CI checks, and loops until all checks are green and no unanswered bot comments remain. |
-| [`critique-loop`](./skills/critique-loop) | Planning | XP-style cross-model critique loop. One agent drives (plan + implement), a different-model agent navigates (adversarial plan review + code review), looping until approval. Currently in design — see [`skills/critique-loop/PLAN.md`](./skills/critique-loop/PLAN.md). |
+| [`critique-loop`](./skills/critique-loop) | Shipped | XP-style pair-programming loop: plan → navigator reviews plan → user approves plan → implement → navigator reviews diff. Navigator is pluggable: Codex CLI (default, `gpt-5.5` at xhigh effort) or Cursor CLI (`gpt-5.3-codex-xhigh`). All rounds share one navigator session (UUID-tracked) so context persists across phases. Claude fixes code/scope-level asks itself; product/architecture questions are surfaced to the user. Artifacts live in `.critique-loop/` — local-only, auto-added to `.gitignore` so they don't pollute the PR. |
 
 ## Installation
 
