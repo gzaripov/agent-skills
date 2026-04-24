@@ -18,6 +18,8 @@ Defaults live here — edit to override. Everything below reads from these.
 - **Navigator CLI:** `codex` (options: `codex` | `cursor`)
 - **Artifact directory:** `.critique-loop/` — **local working state only, gitignored**. Not committed; not part of the PR. Add to `.gitignore` on first run (Step 1).
 - **Slug:** current git branch name, or a kebab-case identifier derived from the task if on `main`/`master`
+- **Plan file path:** `.critique-loop/<slug>-plan.md` (default — **ephemeral mode**, lives under the gitignored artifact directory, never committed).
+  Override to a repo path like `docs/plans/<slug>.md` to use **repo mode** — the plan becomes a first-class committed design doc (skill commits the initial file and each revision as `docs: plan for <slug>` / `docs: revise plan for <slug> (round N)`). Pick repo mode when you want the plan reviewable as part of the PR; pick ephemeral mode when the plan is just scratch for the navigator loop.
 
 Session-id file: `.critique-loop/<slug>.session-id` (created on first call, reused on every resume).
 
@@ -128,11 +130,18 @@ if ! grep -qxE '\.critique-loop/?' .gitignore 2>/dev/null; then
 fi
 ```
 
-The `.gitignore` commit is the only critique-loop-related commit that ever lands in the PR. All other artifacts (plans, reviews, driver responses, session-id) stay local.
+The `.gitignore` commit is the only critique-loop-related commit that ever lands in the PR **from ephemeral mode**. In repo mode (see Configuration → Plan file path) the plan file itself is also committed (see Step 3).
 
 ### Step 2: Write the plan
 
-Write `.critique-loop/<slug>-plan.md` with these sections:
+Write the plan to the configured **Plan file path** (default `.critique-loop/<slug>-plan.md`). If the path is outside `.critique-loop/`, make sure the parent directory exists:
+
+```bash
+PLAN_FILE_PATH=".critique-loop/<slug>-plan.md"  # or the user-configured repo path
+mkdir -p "$(dirname "$PLAN_FILE_PATH")"
+```
+
+Sections:
 
 - **Task** — one paragraph in your own words.
 - **Context** — what the repo constrains (existing patterns, relevant files, prior art).
@@ -140,6 +149,19 @@ Write `.critique-loop/<slug>-plan.md` with these sections:
 - **Files to modify** — paths with one-line reason each.
 - **Verification** — how you'll know it worked (commands to run, manual checks).
 - **Open questions** — things the user or navigator should weigh in on; don't invent answers.
+
+### Step 3: Commit the plan (repo mode only)
+
+If the plan file lives outside `.critique-loop/` (repo mode), commit it:
+
+```bash
+if [[ "$PLAN_FILE_PATH" != .critique-loop/* ]]; then
+  git add "$PLAN_FILE_PATH"
+  git commit -m "docs: plan for <slug>"
+fi
+```
+
+Skip this step in ephemeral mode — the plan is gitignored working state.
 
 ## Phase 2: Navigator reviews the plan
 
@@ -154,7 +176,7 @@ Run **START-SESSION** from the navigator adapter (see Configuration) with:
 ```
 You are the navigator in an XP pair-programming session. The driver (Claude Code) has written a plan for a task.
 
-Read the plan at `.critique-loop/<slug>-plan.md` and any referenced code in the repo. Be adversarial — probe for:
+Read the plan at `${PLAN_FILE_PATH}` and any referenced code in the repo. Be adversarial — probe for:
 
 - missing edge cases and error paths
 - risky assumptions or unstated dependencies
@@ -174,7 +196,7 @@ Output format:
 Do not write code. Do not modify files. Review only.
 ```
 
-Substitute `<slug>` literally in the prompt and file paths. Verify `.critique-loop/<slug>.session-id` is non-empty before continuing.
+Substitute `<slug>` and `${PLAN_FILE_PATH}` literally before passing. Verify `.critique-loop/<slug>.session-id` is non-empty before continuing.
 
 ### Step 5: Read the verdict
 
@@ -192,6 +214,7 @@ The navigator approved, but the user has final say before implementation starts.
 - **Slug** and current branch.
 - **One-sentence summary** of what will be implemented.
 - **Decisions made during review** — list any user answers from Step 6 that shaped the plan (e.g. "strict `h→m→s` order chosen; bare numbers rejected"). Skip this bullet if there were none.
+- **Open questions still unresolved** — read the current plan file's **Open questions** section. List any items not answered by a user decision above. If all are resolved (or the section is empty), skip this bullet. Do NOT silently proceed with unresolved open questions in the plan.
 - **Plan file** path (the user can open it to inspect before saying go).
 - **Explicit prompt:** "Ready to implement? Say 'go' to proceed, or tell me what to change."
 
@@ -200,7 +223,7 @@ Wait for the user's response before doing anything else.
 - **User says "go" / approves** → Phase 3.
 - **User requests minor changes** (wording, small scope trim, ergonomic tweaks) → revise the plan file, show the updated summary again. No navigator round — these are user-preference edits, not correctness changes.
 - **User requests substantive changes** (new requirement, different approach, new concern the navigator didn't raise) → revise the plan file and go back to Step 6b for another navigator round. The user's change shifted the design; the navigator should re-bless it before Phase 3.
-- **User wants to pivot or stop** → stop. The plan file stays on disk (gitignored) so they can come back to it later.
+- **User wants to pivot or stop** → stop. The plan file stays on disk (gitignored in ephemeral mode, or committed in repo mode) so they can come back to it later.
 
 Use judgment on the minor-vs-substantive split. If unsure, prefer another navigator round over skipping straight to implementation.
 
@@ -232,7 +255,18 @@ Write a short note to `.critique-loop/<slug>-driver-response.md`:
 - Any user answers verbatim.
 - Any asks you are pushing back on, and why.
 
-Round number `N` for file naming is tracked by file count in `.critique-loop/` (e.g., look for the highest `-plan-review-<N>.md`). No commit — artifacts are gitignored.
+Round number `N` for file naming is tracked by file count in `.critique-loop/` (e.g., look for the highest `-plan-review-<N>.md`). Review files and driver-response are always gitignored regardless of plan mode.
+
+**Repo-mode only:** if the plan lives outside `.critique-loop/`, commit the revision so the navigator in the next round reads the updated file from a real commit:
+
+```bash
+if [[ "$PLAN_FILE_PATH" != .critique-loop/* ]]; then
+  git add "$PLAN_FILE_PATH"
+  git commit -m "docs: revise plan for <slug> (round N)"
+fi
+```
+
+In ephemeral mode, skip — the navigator reads the working-tree file directly.
 
 ### Step 6b: Re-review (resume the same session)
 
@@ -240,10 +274,10 @@ Run **RESUME-SESSION** from the navigator adapter with:
 
 - `<SLUG>` = the task slug
 - `<OUTPUT_FILE>` = `.critique-loop/<slug>-plan-review-<N+1>.md` (increment `<N+1>` each round: `-plan-review-2.md`, `-plan-review-3.md`, …)
-- `<PROMPT>`:
+- `<PROMPT>` (substitute `${PLAN_FILE_PATH}` before passing):
 
 ```
-I revised the plan based on your review. Updated plan: `.critique-loop/<slug>-plan.md`. My response to each ask: `.critique-loop/<slug>-driver-response.md`.
+I revised the plan based on your review. Updated plan: `${PLAN_FILE_PATH}`. My response to each ask: `.critique-loop/<slug>-driver-response.md`.
 
 Re-review. Note which prior asks are resolved and which remain open. Same output format, end with `VERDICT:`.
 ```
@@ -264,7 +298,7 @@ After the user approves in Step 5b, capture the current HEAD SHA. This is the ba
 git rev-parse HEAD > .critique-loop/<slug>.plan-sha
 ```
 
-The plan file itself is not committed (it's gitignored), so HEAD is whatever the branch was before implementation started.
+In ephemeral mode the plan is gitignored, so HEAD is the last real commit on the branch. In repo mode the plan's revision commits are included in `<plan-sha>..HEAD`, which is fine — the navigator already approved them in Phase 2, so they don't show up as asks in Phase 4.
 
 ### Step 9: Implement
 
@@ -298,12 +332,12 @@ Run **RESUME-SESSION** from the navigator adapter with:
 
 - `<SLUG>` = the task slug
 - `<OUTPUT_FILE>` = `.critique-loop/<slug>-code-review.md`
-- `<PROMPT>` (substitute `${PLAN_SHA}` with the captured SHA before passing):
+- `<PROMPT>` (substitute `${PLAN_SHA}` and `${PLAN_FILE_PATH}` before passing):
 
 ```
 The plan you approved is implemented. Review the diff.
 
-- Plan: `.critique-loop/<slug>-plan.md`
+- Plan: `${PLAN_FILE_PATH}`
 - Diff summary: `.critique-loop/<slug>-diff-summary.md`
 - Commit range: `${PLAN_SHA}..HEAD`
 
