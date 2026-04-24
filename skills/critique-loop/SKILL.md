@@ -1,14 +1,15 @@
 ---
 name: critique-loop
-description: Plan a task, have a different-model navigator adversarially review the plan, wait for the user to approve the plan, implement it, then have the navigator review the diff. Same navigator session across all rounds so it retains context. Navigator is pluggable — Codex CLI (default) or Cursor CLI with GPT models. Claude resolves code-level asks itself; product/architecture questions are surfaced to the user, then the same session resumes with the answer.
+description: Cross-model critique loop with two entry points. Full flow — plan → navigator reviews plan → user approves → implement → navigator reviews diff. Review-only flow — navigator adversarially reviews an existing diff; no plan, no implementation. Same navigator session across rounds so it retains context. Navigator is pluggable — Codex CLI (default, gpt-5.5 at xhigh effort) or Cursor CLI (gpt-5.3-codex-xhigh). Claude resolves code-level asks itself; product/architecture questions are surfaced to the user, then the same session resumes with the answer.
 license: MIT
 compatibility: Requires either Codex CLI (`codex`, authenticated with `codex login`) or Cursor CLI (`cursor-agent`, authenticated with `cursor-agent login`). Run from inside a git repository, on a feature branch (not `main`/`master`).
 allowed-tools: Bash(codex exec *) Bash(codex exec resume *) Bash(cursor-agent *) Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git rev-parse *) Bash(git branch --show-current) Bash(mkdir -p .critique-loop) Bash(cat .critique-loop/*) Bash(grep -oE *) Bash(tee .critique-loop/*)
 ---
 
-Use this skill when the user wants an XP-style pair-programming loop with a different-model adversarial navigator: plan → navigator reviews → (fix or ask user) → **user approves the plan** → implement → navigator reviews the diff → (fix or ask user) → done. Trigger phrases: "critique-loop on <task>", "pair with Codex/Cursor on this", "plan and have Codex review", or "do this with cross-model review".
+Use this skill when the user wants an adversarial cross-model review. Two flows:
 
-All four phases share a single navigator session (tracked by UUID in `.critique-loop/<slug>.session-id`, resumed on every subsequent call) so the navigator remembers the plan discussion when it reviews the code.
+- **Full flow** — plan → navigator reviews → (fix or ask user) → **user approves the plan** → implement → navigator reviews the diff → (fix or ask user) → done. All four phases share a single navigator session (tracked by UUID in `.critique-loop/<slug>.session-id`, resumed on every subsequent call) so the navigator remembers the plan discussion when it reviews the code. Trigger phrases: "critique-loop on <task>", "pair with Codex/Cursor on this", "plan and have Codex review", "do this with cross-model review".
+- **Review-only flow** — skip planning and implementation; run just the navigator code-review loop against an existing diff. Trigger phrases: "review my changes with Codex/Cursor", "critique-review this branch", "have the navigator look at my diff". See the **Review-only flow** section at the end of this document.
 
 ## Configuration
 
@@ -383,3 +384,84 @@ Bail and ask the user when:
 - During Phase 3, the lint/test suite fails in a way that requires judgement outside the plan (flaky infra, unrelated breakage, architectural conflict) — don't silently rewrite the plan to dodge it.
 
 Never change the model, effort, sandbox mode, or navigator CLI to coerce a different verdict. If the user wants a different configuration, they edit the Configuration section above.
+
+## Review-only flow
+
+Use this when the user has changes already and just wants an adversarial navigator review — no plan, no Claude implementation. Everything from the navigator adapter, the verdict format, the Step 6 classification rule (Claude-resolves vs. user-surface), and the RESUME-SESSION loop applies unchanged.
+
+### Review-only Step R1: Setup
+
+Same as Phase 1 Step 1 — pick the `<slug>` (from the current branch name, or ask if on `main`/`master`), create `.critique-loop/`, and ensure the directory is gitignored:
+
+```bash
+SLUG=$(git branch --show-current)
+mkdir -p .critique-loop
+if ! grep -qxE '\.critique-loop/?' .gitignore 2>/dev/null; then
+  echo ".critique-loop/" >> .gitignore
+  git add .gitignore
+  git commit -m "chore: gitignore .critique-loop artifacts"
+fi
+```
+
+### Review-only Step R2: Determine the diff range
+
+Ask the user what to review if the intent isn't obvious. Default: the branch's changes versus its merge base with `origin/main`:
+
+```bash
+BASE=$(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD main)
+REVIEW_RANGE="${BASE}..HEAD"
+echo "${REVIEW_RANGE}" > .critique-loop/<slug>.review-range
+```
+
+Other shapes the user may want:
+- `HEAD` for uncommitted working-tree changes (the navigator reads `git diff HEAD` instead of a range).
+- `<sha1>..<sha2>` for a specific commit range.
+- `<base>...HEAD` (three-dot) for three-dot merge-base semantics.
+
+Record whichever was chosen in the `review-range` file.
+
+### Review-only Step R3: Navigator reviews the diff
+
+Run **START-SESSION** from the navigator adapter with:
+
+- `<SLUG>` = the task slug
+- `<OUTPUT_FILE>` = `.critique-loop/<slug>-code-review.md`
+- `<PROMPT>` (substitute `${REVIEW_RANGE}` with the captured range before passing):
+
+```
+You are the navigator in a cross-model code review. The driver has changes they want reviewed adversarially before shipping.
+
+Run `git diff ${REVIEW_RANGE}` and read the changed files. Be adversarial — probe for:
+
+- bugs, regressions, missed edge cases
+- missing or inadequate tests
+- security, performance, or correctness issues
+- scope creep or leftover debug code
+- simpler alternatives the driver missed
+
+Output format: same as standard critique-loop reviews — numbered asks with file:line refs, ending with `VERDICT: APPROVE | CHANGES_REQUESTED | BLOCK`.
+
+Do not write code. Do not modify files. Review only.
+```
+
+### Review-only Step R4: Handle the verdict
+
+Read `.critique-loop/<slug>-code-review.md` and branch on the verdict:
+
+- **`VERDICT: APPROVE`** → summarize rounds and any product decisions surfaced to the user; done. The branch is the user's to push / PR as they see fit.
+- **`VERDICT: CHANGES_REQUESTED`** → apply the Step 6 classification:
+  - Code-level asks → Claude fixes in the code with conventional commits (`fix:`, `test:`, `refactor:`, etc.).
+  - Product / architecture / scope asks → surface to the user, wait for the answer.
+  - Append notes to `.critique-loop/<slug>-driver-response.md` as in the full flow (gitignored; do not commit).
+  - Then run **RESUME-SESSION** with `<OUTPUT_FILE>` = `.critique-loop/<slug>-code-review-<N+1>.md` (increment each round) and this follow-up prompt (substitute `${REVIEW_RANGE}` before passing):
+
+    ```
+    I addressed your code-review asks. New commits are on top of the range. Response notes: `.critique-loop/<slug>-driver-response.md`.
+
+    Re-review the full diff (`git diff ${REVIEW_RANGE}` — note HEAD has moved since your last review). Note which prior asks are resolved and which remain open. Same output format, end with `VERDICT:`.
+    ```
+
+  - Loop: go back to the start of Step R4 with the new review file.
+- **`VERDICT: BLOCK`** → summarize the blocker for the user in 2–4 sentences, include the navigator's suggested direction, stop. Do not re-invoke the navigator until the user responds.
+
+All stopping rules above still apply (3 identical asks in a row, 5 rounds, missing `VERDICT:` twice, etc.). No user-approval gate — the user is already driving; when the navigator approves, the skill terminates.
