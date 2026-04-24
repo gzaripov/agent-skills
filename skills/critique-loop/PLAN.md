@@ -1,8 +1,10 @@
-# Plan — XP-style cross-model pair skill (new public repo)
+# Plan — `critique-loop` skill
+
+> **Status (2026-04-24):** Name chosen (`critique-loop`). Home chosen (`gzaripov/agent-skills` monorepo at `skills/critique-loop/`, not a standalone repo). Implementation pending.
 
 ## Context
 
-Build a new skill, shipped as a separate public GitHub repo under `gzaripov/<name-tbd>`, that implements an XP pair-programming workflow across **two different coding agents**: one drives (plans + implements), the other navigates (reviews). The four-phase flow the user described is:
+Build a `critique-loop` skill inside the `gzaripov/agent-skills` monorepo that implements an XP pair-programming workflow across **two different coding agents**: one drives (plans + implements), the other navigates (adversarial review). The four-phase flow the user described is:
 
 1. Driver writes a plan.
 2. Navigator (other model) reviews the plan.
@@ -12,7 +14,7 @@ Build a new skill, shipped as a separate public GitHub repo under `gzaripov/<nam
 **Why this is worth building even given prior art.** Research surfaced several overlapping tools — OpenAI's official `codex-plugin-cc`, `ching-kuo/claude-codex`, `JuliusBrussee/cavekit`, `wanshuiyin/ARIS`, `religa/multi_mcp`, `praneybehl/code-review-mcp`. All of them are MCP-based and all but ARIS are one-directional (Claude → Codex). The research literature (Microsoft Critique Mode: +13.8% DRACO; Reflection: HumanEval 80% → 91%) validates the pattern; the gap is in the *packaging*. Our four differentiation angles (all confirmed by the user):
 
 - **Bidirectional** — either tool can be the driver. Symmetric SKILL.md / cursor / codex variants.
-- **Shared-file handoff, no MCP** — all state lives in `.pair/*.md`, driver invokes navigator via headless CLI (`codex exec`, `claude -p`). Works in any tool that can read/write files and shell out, no per-user MCP setup.
+- **Shared-file handoff, no MCP** — all state lives in `.critique-loop/*.md`, driver invokes navigator via headless CLI (`codex exec`, `claude -p`). Works in any tool that can read/write files and shell out, no per-user MCP setup.
 - **Multi-host from day one** — same `babysit-pr` pattern: install targets for Claude Code, Cursor, and Codex CLI.
 - **XP vocabulary** — *driver* / *navigator*, with explicit role-swap guidance. No prior art frames it this way.
 
@@ -23,33 +25,34 @@ Build a new skill, shipped as a separate public GitHub repo under `gzaripov/<nam
 | Decision | Choice |
 | --- | --- |
 | Direction | Bidirectional (Claude drives + Codex drives + Cursor drives) |
-| Handoff mechanism | Shared files in `.pair/` + headless CLI invocations |
+| Handoff mechanism | Shared files in `.critique-loop/` + headless CLI invocations |
 | Loop depth | Loop until navigator approves, no cap (user can always interrupt) |
 | Global context file | No AGENTS.md template — SKILL.md is self-sufficient |
-| Artifact lifecycle | `.pair/*.md` committed to git (full audit trail in the PR) |
-| Name | **Deferred** — user will pick after reviewing this plan. Candidates: `pair`, `pair-program`, `ping-pong`, `driver-navigator`, `xp-pair`, `pair-agents`. I'll default to `pair` in the plan below as a placeholder. |
+| Artifact lifecycle | `.critique-loop/*.md` committed to git (full audit trail in the PR) |
+| Name | `critique-loop` (selected 2026-04-24). Named for the adversarial iterative pattern — echoes Microsoft's "Critique Mode" and ARIS's `auto-review-loop`. |
+| Home | `gzaripov/agent-skills` monorepo, `skills/critique-loop/` (selected 2026-04-24). Not a standalone repo. |
 
-## Repo layout
+## Repo layout (inside `agent-skills` monorepo)
 
 ```
-<name>/
-├── README.md                   # install, usage, prerequisites, FAQ
-├── LICENSE                     # MIT
-├── SKILL.md                    # Claude Code driver (invokes codex exec OR claude -p)
-├── cursor/
-│   └── <name>.mdc              # Cursor driver (invokes codex exec)
-└── codex/
-    └── <name>.md               # Codex driver (invokes claude -p)
+agent-skills/
+└── skills/
+    └── critique-loop/
+        ├── SKILL.md                     # Claude Code driver (invokes codex exec OR claude -p)
+        ├── cursor/
+        │   └── critique-loop.mdc        # Cursor driver (invokes codex exec)
+        └── codex/
+            └── critique-loop.md         # Codex driver (invokes claude -p)
 ```
 
-No MCP config, no examples dir, no AGENTS.md. Each variant file is self-contained.
+Install and usage docs for this skill live in the monorepo's top-level `README.md`, in the skills table. No MCP config, no examples dir, no AGENTS.md. Each variant file is self-contained.
 
 ## Runtime artifact layout (inside a user's project)
 
 Per PR / task, the driver creates:
 
 ```
-.pair/
+.critique-loop/
 ├── <slug>-plan.md              # driver writes in Phase 1
 ├── <slug>-plan-review.md       # navigator writes in Phase 2
 ├── <slug>-plan-review-2.md     # second round if CHANGES_REQUESTED (numbered)
@@ -57,14 +60,14 @@ Per PR / task, the driver creates:
 └── <slug>-code-review.md       # navigator writes in Phase 4
 ```
 
-`<slug>` = branch name or short task identifier. Files are committed with `chore(pair): …` commits; verdict lines at the bottom of each review file (`VERDICT: APPROVE | CHANGES_REQUESTED | BLOCK`).
+`<slug>` = branch name or short task identifier. Files are committed with `chore(critique-loop): …` commits; verdict lines at the bottom of each review file (`VERDICT: APPROVE | CHANGES_REQUESTED | BLOCK`).
 
 ## Workflow (encoded in all three variant files)
 
 ### Phase 1 — Plan (driver)
 
-- Driver reads the task, explores the repo, drafts `.pair/<slug>-plan.md` with sections: *Context*, *Approach*, *Files to modify (with paths)*, *Verification*, *Open questions*.
-- Driver stages and commits: `chore(pair): plan for <slug>`.
+- Driver reads the task, explores the repo, drafts `.critique-loop/<slug>-plan.md` with sections: *Context*, *Approach*, *Files to modify (with paths)*, *Verification*, *Open questions*.
+- Driver stages and commits: `chore(critique-loop): plan for <slug>`.
 
 ### Phase 2 — Plan review (navigator)
 
@@ -73,10 +76,10 @@ Per PR / task, the driver creates:
   - **Codex-driver → Claude-navigator:** `claude -p "$PROMPT"`
   - **Cursor-driver → either:** shell out to whichever CLI is present.
 - The prompt template (stored inline in each SKILL file):
-  > You are the navigator in an XP pair-programming session. Read `.pair/<slug>-plan.md` and the referenced code. Be adversarial — probe for missing edge cases, risky assumptions, unstated dependencies, and simpler alternatives. Write your review to `.pair/<slug>-plan-review.md`. End with exactly one line: `VERDICT: APPROVE` or `VERDICT: CHANGES_REQUESTED` (with numbered requested changes) or `VERDICT: BLOCK` (with rationale).
+  > You are the navigator in an XP pair-programming session. Read `.critique-loop/<slug>-plan.md` and the referenced code. Be adversarial — probe for missing edge cases, risky assumptions, unstated dependencies, and simpler alternatives. Write your review to `.critique-loop/<slug>-plan-review.md`. End with exactly one line: `VERDICT: APPROVE` or `VERDICT: CHANGES_REQUESTED` (with numbered requested changes) or `VERDICT: BLOCK` (with rationale).
 - Driver reads the verdict:
   - `APPROVE` → Phase 3.
-  - `CHANGES_REQUESTED` → driver revises plan, commits `chore(pair): revise plan (round N)`, **re-invokes** navigator; loop until approve.
+  - `CHANGES_REQUESTED` → driver revises plan, commits `chore(critique-loop): revise plan (round N)`, **re-invokes** navigator; loop until approve.
   - `BLOCK` → driver surfaces the rationale to the user; stop.
 
 ### Phase 3 — Implement (driver)
@@ -84,13 +87,13 @@ Per PR / task, the driver creates:
 - Driver implements exactly what the approved plan describes.
 - Uses conventional commits (`feat:`, `fix:`, etc.).
 - After implementation: runs the project's lint + tests.
-- Driver writes `.pair/<slug>-diff.md` with: the commit range (`<plan-sha>..HEAD`), a short what-changed summary, and pointers to the files touched.
-- Commits: `chore(pair): implement <slug>`.
+- Driver writes `.critique-loop/<slug>-diff.md` with: the commit range (`<plan-sha>..HEAD`), a short what-changed summary, and pointers to the files touched.
+- Commits: `chore(critique-loop): implement <slug>`.
 
 ### Phase 4 — Code review (navigator)
 
 - Driver invokes navigator CLI with:
-  > You are the navigator. The approved plan is at `.pair/<slug>-plan.md`. The implementation is at commits `<plan-sha>..HEAD` (summary in `.pair/<slug>-diff.md`). Run `git diff <plan-sha>..HEAD`, read the changed files, and verify: (a) the implementation matches the approved plan, (b) no scope creep, (c) no introduced bugs, (d) tests cover the changes. Write to `.pair/<slug>-code-review.md`. End with `VERDICT: APPROVE` or `VERDICT: CHANGES_REQUESTED` (with line-referenced asks).
+  > You are the navigator. The approved plan is at `.critique-loop/<slug>-plan.md`. The implementation is at commits `<plan-sha>..HEAD` (summary in `.critique-loop/<slug>-diff.md`). Run `git diff <plan-sha>..HEAD`, read the changed files, and verify: (a) the implementation matches the approved plan, (b) no scope creep, (c) no introduced bugs, (d) tests cover the changes. Write to `.critique-loop/<slug>-code-review.md`. End with `VERDICT: APPROVE` or `VERDICT: CHANGES_REQUESTED` (with line-referenced asks).
 - Driver reads verdict:
   - `APPROVE` → session complete; summary report; user merges at will.
   - `CHANGES_REQUESTED` → driver fixes, commits, re-invokes navigator; loop.
@@ -103,11 +106,11 @@ One section in each SKILL file documents a *swap* mode the user can opt into: af
 
 | Path | Purpose |
 | --- | --- |
-| `/Users/gzaripov/code/<name>/README.md` | Install (manual + `skills add`), usage, prerequisites, differentiation section citing prior art. Mirror `babysit-pr` README structure. |
-| `/Users/gzaripov/code/<name>/LICENSE` | MIT, copyright 2026 Grigory Zaripov. |
-| `/Users/gzaripov/code/<name>/SKILL.md` | Claude Code skill with frontmatter (`name`, `description`, `license`, `allowed-tools` including `Bash(codex exec *)`, `Bash(claude -p *)`, `Bash(git *)`) and the four-phase workflow body. |
-| `/Users/gzaripov/code/<name>/cursor/<name>.mdc` | Cursor rule variant, same body, Cursor frontmatter (`alwaysApply: false`). |
-| `/Users/gzaripov/code/<name>/codex/<name>.md` | Codex prompt variant, same body, no frontmatter. |
+| `/Users/gzaripov/code/agent-skills/skills/critique-loop/SKILL.md` | Claude Code skill with frontmatter (`name: critique-loop`, `description`, `license`, `allowed-tools` including `Bash(codex exec *)`, `Bash(claude -p *)`, `Bash(git *)`) and the four-phase workflow body. |
+| `/Users/gzaripov/code/agent-skills/skills/critique-loop/cursor/critique-loop.mdc` | Cursor rule variant, same body, Cursor frontmatter (`alwaysApply: false`). |
+| `/Users/gzaripov/code/agent-skills/skills/critique-loop/codex/critique-loop.md` | Codex prompt variant, same body, no frontmatter. |
+| `/Users/gzaripov/code/agent-skills/README.md` | Add a row to the skills table pointing at `critique-loop`, plus any per-skill install notes if they deviate from the generic `skills add --skill critique-loop` flow. |
+| (when done) Delete `/Users/gzaripov/code/agent-skills/skills/critique-loop/PLAN.md` or rename to `NOTES.md` — the SKILL.md supersedes it. |
 
 ## Patterns to reuse from `babysit-pr`
 
@@ -186,8 +189,8 @@ One section in each SKILL file documents a *swap* mode the user can opt into: af
 
 ### Option A — Standalone repo, SWE-focused
 
-- **What.** New repo under `gzaripov/<name>`. Same philosophy as ARIS (markdown-only, multi-host, bidirectional, adversarial) but specialized for general software engineering. XP pair-programming framing. Three host variants: Claude Code (SKILL.md), Cursor (`.mdc`), Codex (prompt).
-- **Scope.** Four SKILL files + README + LICENSE. No Node.js, no subagents, no hooks, no token ledger. Just plan → review → implement → review using `.pair/*.md` and `codex exec` / `claude -p` shell-outs.
+- **What.** New repo under `gzaripov/<name>` (updated 2026-04-24: chose the `agent-skills` monorepo, skill named `critique-loop`). Same philosophy as ARIS (markdown-only, multi-host, bidirectional, adversarial) but specialized for general software engineering. XP pair-programming framing. Three host variants: Claude Code (SKILL.md), Cursor (`.mdc`), Codex (prompt).
+- **Scope.** Four SKILL files + README + LICENSE. No Node.js, no subagents, no hooks, no token ledger. Just plan → review → implement → review using `.critique-loop/*.md` and `codex exec` / `claude -p` shell-outs.
 - **Pros.**
   - Clean slate; no legacy from ARIS's research branding.
   - Full control over naming, framing (XP vocabulary), and UX.
@@ -262,7 +265,7 @@ ARIS's convention actually differs from what we'd want. Summary:
 | Aspect | ARIS `auto-review-loop` | Our design |
 | --- | --- | --- |
 | Verdict | Numeric score (1–10) + categorical (`ready`/`almost`/`not ready`); stop when `score ≥ 6 AND verdict ∈ {ready, almost}` | `VERDICT: APPROVE / CHANGES_REQUESTED / BLOCK` (matches GitHub PR review vocabulary, fits XP pair framing) |
-| State dir | `review-stage/` | `.pair/` |
+| State dir | `review-stage/` | `.critique-loop/` |
 | Files | `AUTO_REVIEW.md` (append-log), `REVIEW_STATE.json`, `REVIEWER_MEMORY.md`, `findings.md` | `<slug>-plan.md`, `<slug>-plan-review.md`, `<slug>-diff.md`, `<slug>-code-review.md` — no JSON state, no separate memory file |
 | Invocation | MCP primary (`mcp__codex__codex` + `codex-reply` for continuity); `codex exec` fallback for "nightmare" mode | Shell-out primary (`codex exec` / `claude -p`); no MCP dependency |
 | Round cap | `MAX_ROUNDS = 4`; on max, document blockers and suggest pivot | Uncapped (per user decision); user can interrupt |
@@ -270,7 +273,7 @@ ARIS's convention actually differs from what we'd want. Summary:
 **Decision: don't adopt ARIS's conventions.** Rationale:
 
 - **Verdict format:** `APPROVE/CHANGES_REQUESTED/BLOCK` maps 1:1 to GitHub PR review verbs users already know. ARIS's score+categorical is more nuanced but requires interpretation. XP framing favors the PR-review vocabulary.
-- **State dir:** `.pair/` matches skill name and XP framing; `review-stage/` suggests a research pipeline.
+- **State dir:** `.critique-loop/` matches skill name and XP framing; `review-stage/` suggests a research pipeline.
 - **No JSON state:** markdown-only is our philosophical commitment; presence/absence of files encodes enough state.
 - **Invocation:** shell-out is the *differentiator* vs. every other SWE-oriented prior-art tool. Keeping MCP optional (documented, not required) preserves the no-setup win.
 - **Round cap:** user explicitly asked for "no cap." We add a safety note in the stopping-rules section ("ask the user after N rounds if nothing is converging") but don't enforce.
@@ -281,10 +284,11 @@ ARIS's convention actually differs from what we'd want. Summary:
 
 Option A (standalone repo). Concrete execution sequence when plan is approved:
 
-1. **User picks a name** from `pair`, `pair-program`, `ping-pong`, `driver-navigator`, `xp-pair`, `pair-agents`, or a fresh suggestion.
-2. `mkdir /Users/gzaripov/code/<name>` and write four files: `README.md`, `LICENSE`, `SKILL.md`, `cursor/<name>.mdc`, `codex/<name>.md`.
-3. `git init -b main`; `gh repo create gzaripov/<name> --public --source=. --remote=origin --description "XP pair-programming skill …" --push`.
-4. Install locally into `~/.claude/skills/<name>/` and smoke-test per the Verification section above.
+1. ~~Pick a name~~ — done: `critique-loop`.
+2. Write three files: `skills/critique-loop/SKILL.md`, `skills/critique-loop/cursor/critique-loop.mdc`, `skills/critique-loop/codex/critique-loop.md` inside the existing `agent-skills` monorepo.
+3. Update the top-level `README.md` skills table: change `critique-loop` status from "Planning" to "Shipped" and link to the skill directory.
+4. Commit, push to `origin/main`.
+5. Install locally: `npx skills add gzaripov/agent-skills --skill critique-loop -a claude-code -g`, and smoke-test per the Verification section above.
 
 The only blocker now is the naming decision.
 
@@ -299,9 +303,9 @@ The only blocker now is the naming decision.
 ## Execution steps (after plan approval)
 
 1. Resolve the naming question with the user.
-2. `mkdir /Users/gzaripov/code/<name>` and write `README.md`, `LICENSE`, `SKILL.md`, `cursor/<name>.mdc`, `codex/<name>.md`.
-3. `git init -b main`, commit, `gh repo create gzaripov/<name> --public --source=. --remote=origin --push`.
-4. Install locally into `~/.claude/skills/<name>/` for smoke-testing.
+2. Write `skills/critique-loop/SKILL.md`, `skills/critique-loop/cursor/critique-loop.mdc`, `skills/critique-loop/codex/critique-loop.md` inside the existing `gzaripov/agent-skills` repo.
+3. Update the monorepo top-level `README.md` (flip critique-loop status to "Shipped"), commit, and push.
+4. Install locally via `npx skills add gzaripov/agent-skills --skill critique-loop -a claude-code -g` for smoke-testing.
 
 ## Verification
 
@@ -311,12 +315,12 @@ Dry-run end-to-end inside a throwaway git repo:
 2. Install the skill into Claude Code (user-level), create a branch, open a trivial PR.
 3. Invoke the skill on a small task (e.g., "add a `hello()` function to `src/index.js` with one unit test").
 4. Confirm:
-   - `.pair/<slug>-plan.md` is created and committed.
-   - `codex exec` is invoked (or the reverse if Codex is driving) and writes `.pair/<slug>-plan-review.md` with a `VERDICT:` line.
+   - `.critique-loop/<slug>-plan.md` is created and committed.
+   - `codex exec` is invoked (or the reverse if Codex is driving) and writes `.critique-loop/<slug>-plan-review.md` with a `VERDICT:` line.
    - The driver loops on `CHANGES_REQUESTED` and proceeds on `APPROVE`.
    - Implementation commits land.
-   - `.pair/<slug>-code-review.md` is produced.
-5. Repeat with Codex as driver (`codex/<name>.md` prompt) invoking `claude -p` as navigator.
+   - `.critique-loop/<slug>-code-review.md` is produced.
+5. Repeat with Codex as driver (`skills/critique-loop/codex/critique-loop.md` prompt) invoking `claude -p` as navigator.
 6. Repeat with Cursor as driver.
 7. Verify the prompt text survives through all three shells without quoting bugs.
 
@@ -324,5 +328,5 @@ Manual QA checklist lives at the bottom of the README.
 
 ## Open questions for the user (pre-execution)
 
-- **Name** — pick from: `pair`, `pair-program`, `ping-pong`, `driver-navigator`, `xp-pair`, `pair-agents`, or a fresh suggestion.
+- ~~Name~~ — resolved 2026-04-24: `critique-loop`.
 - **Default navigator model** — should SKILL.md hardcode `--model gpt-5` for `codex exec`, or leave model selection to the user's codex config?

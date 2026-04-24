@@ -9,7 +9,7 @@ Each skill is self-contained, portable across tools, and installable individuall
 | Skill | Status | What it does |
 | --- | --- | --- |
 | [`babysit-pr`](./skills/babysit-pr) | Shipped | Watches an open PR until it's merge-ready — resolves bot review comments, fixes failing CI checks, and loops until all checks are green and no unanswered bot comments remain. |
-| [`pair`](./skills/pair) | Planning | XP-style cross-model pair-programming skill. One agent drives (plan + implement), a different-model agent navigates (adversarial plan review + code review). Currently in design — see [`skills/pair/PLAN.md`](./skills/pair/PLAN.md). |
+| [`critique-loop`](./skills/critique-loop) | Planning | XP-style cross-model critique loop. One agent drives (plan + implement), a different-model agent navigates (adversarial plan review + code review), looping until approval. Currently in design — see [`skills/critique-loop/PLAN.md`](./skills/critique-loop/PLAN.md). |
 
 ## Installation
 
