@@ -145,20 +145,20 @@ and the `proposed` scenario (current plus the `cache` node and its new edges).
 
 ## Render and commit
 
-With `d2` installed, render the file. D2 renders **every scenario** in the file; point
-the output at an SVG and D2 emits one file per scenario:
+With `d2` installed, render each board to its own SVG with `--target`. `--target ''`
+selects the base board (the current architecture); `--target 'scenarios.<name>'`
+selects a named scenario (the proposed architecture):
 
 ```sh
-d2 docs/features/<slug>/diagrams/architecture.d2 \
-   docs/features/<slug>/diagrams/architecture.svg
+D=docs/features/<slug>/diagrams
+d2 --target ''                   "$D/architecture.d2" "$D/architecture-current.svg"
+d2 --target 'scenarios.proposed' "$D/architecture.d2" "$D/architecture-proposed.svg"
 ```
 
-D2 writes the base diagram to `architecture.svg` and each named scenario to a
-per-scenario file (`architecture-proposed.svg` for the `proposed` scenario). Rename or
-target the outputs so the artifact set matches the expected paths:
-
-- `docs/features/<slug>/diagrams/architecture-current.svg` — the base diagram.
-- `docs/features/<slug>/diagrams/architecture-proposed.svg` — the `proposed` scenario.
+A plain `d2 architecture.d2 architecture.svg` with no `--target` instead produces a
+single SVG holding every board with interactive navigation between them. That is handy
+for browsing but does not emit the two separate files the artifact set expects — use
+the two `--target` calls above.
 
 Commit **both the `.d2` source and the rendered `.svg` files** with a `docs:`
 conventional commit. If `d2` was unavailable, commit the `.d2` source only and embed it
