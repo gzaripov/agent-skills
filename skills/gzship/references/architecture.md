@@ -143,11 +143,13 @@ scenarios: {
 Rendering this file produces two diagrams: the base (current — client → backend → db)
 and the `proposed` scenario (current plus the `cache` node and its new edges).
 
-## Render and commit
+## Render, embed, and commit
 
-With `d2` installed, render each board to its own SVG with `--target`. `--target ''`
-selects the base board (the current architecture); `--target 'scenarios.<name>'`
-selects a named scenario (the proposed architecture):
+**Always render the diagram yourself — never hand the developer a raw `.d2`
+file.** With `d2` installed, render each board to its own SVG with `--target`.
+`--target ''` selects the base board (the current architecture);
+`--target 'scenarios.<name>'` selects a named scenario (the proposed
+architecture):
 
 ```sh
 D=docs/features/<slug>/diagrams
@@ -160,9 +162,18 @@ single SVG holding every board with interactive navigation between them. That is
 for browsing but does not emit the two separate files the artifact set expects — use
 the two `--target` calls above.
 
-Commit **both the `.d2` source and the rendered `.svg` files** with a `docs:`
-conventional commit. If `d2` was unavailable, commit the `.d2` source only and embed it
-fenced in `design.md` per the fallback above.
+**Embed the rendered SVGs inline in `design.md`** with markdown image syntax, so
+the developer sees the diagrams in the document itself — do not merely link to
+them:
+
+```markdown
+![Current architecture](./diagrams/architecture-current.svg)
+![Proposed architecture](./diagrams/architecture-proposed.svg)
+```
+
+Commit **the `.d2` source and both rendered `.svg` files** with a `docs:`
+conventional commit. If `d2` was unavailable, commit the `.d2` source only and embed
+it fenced in `design.md` per the fallback above.
 
 ## The design document
 

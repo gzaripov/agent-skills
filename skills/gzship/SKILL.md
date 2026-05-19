@@ -41,7 +41,7 @@ Dispatch parallel `Explore` subagents to survey where the feature lands and what
 ### Phase 3 — Architecture & Design
 **REQUIRED BACKGROUND:** `references/architecture.md` — read before surveying or diagramming.
 
-Dispatch parallel subagents to survey the existing architecture. Produce one `diagrams/architecture.d2` holding both the current and proposed states (see `references/architecture.md` for the D2 syntax). Write `docs/features/<slug>/design.md`: components, interfaces, data flow, error handling, tradeoffs, and the **implementation stage breakdown**.
+Dispatch parallel subagents to survey the existing architecture. Produce one `diagrams/architecture.d2` holding both the current and proposed states, **render it to SVGs yourself, and embed those SVGs inline in `design.md`** (never hand over a raw `.d2`) — see `references/architecture.md`. Write `docs/features/<slug>/design.md`: components, interfaces, data flow, error handling, tradeoffs, and the **implementation stage breakdown**.
 
 ### Phase 4 — Design Review Gate (two approvals)
 Same shape as Phase 2:
