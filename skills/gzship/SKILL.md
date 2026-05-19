@@ -3,7 +3,7 @@ name: gzship
 description: Use when building a feature end-to-end, taking an idea or product request from a BDD scenario through to shipped code, or doing BDD/TDD feature work on a feature branch.
 license: MIT
 compatibility: Claude Code only — uses subagents (the Agent tool) and task tracking, with no cursor/codex variant. Requires the `critique-loop` skill and the `plannotator` CLI installed; the `d2` binary is optional (diagram rendering). Run from inside a git repository, on a feature branch (not `main`/`master`).
-allowed-tools: Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git rev-parse *) Bash(git branch --show-current) Bash(mkdir -p docs/features/*) Bash(d2 *) Bash(plannotator annotate *) Agent
+allowed-tools: Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git rev-parse *) Bash(git branch --show-current) Bash(mkdir -p docs/features/*) Bash(d2 *) Bash(plannotator --help) Bash(plannotator annotate *) Agent
 ---
 
 Carry one feature from a BDD scenario, through architecture and design, into a staged TDD implementation on a feature branch. Outside-in: behavior first, architecture second, code last.
@@ -34,7 +34,7 @@ Dispatch parallel `Explore` subagents to survey where the feature lands and what
 ### Phase 2 — Scenario Review Gate (two approvals)
 **REQUIRED SUB-SKILL:** `critique-loop` (review-only flow).
 
-1. **Navigator review** — run `critique-loop`'s review-only flow against `scenarios.md`. Resolve code/scope asks directly; surface product asks to the developer.
+1. **Navigator review** — run `critique-loop`'s review-only flow against `scenarios.md` with slug `<slug>-scenarios` (see **Calling critique-loop**). Resolve code/scope asks directly; surface product asks to the developer.
 2. **Developer review** — run `plannotator annotate docs/features/<slug>/scenarios.md`. Address **every** returned annotation. An inline chat message is not this gate.
 3. Advance to Phase 3 only after both an APPROVE verdict and **explicit** developer approval.
 
@@ -45,7 +45,7 @@ Dispatch parallel subagents to survey the existing architecture. Produce one `di
 
 ### Phase 4 — Design Review Gate (two approvals)
 Same shape as Phase 2:
-1. **Navigator review** — `critique-loop` review-only flow on `design.md`. Resolve code/scope asks directly; surface architecture and product tradeoffs to the developer.
+1. **Navigator review** — `critique-loop` review-only flow on `design.md` with slug `<slug>-design` (see **Calling critique-loop**). Resolve code/scope asks directly; surface architecture and product tradeoffs to the developer.
 2. **Developer review** — `plannotator annotate docs/features/<slug>/design.md`; address every annotation.
 3. Advance to Phase 5 only after both an APPROVE verdict and explicit developer approval.
 
@@ -55,10 +55,10 @@ Same shape as Phase 2:
 For each stage in the design's breakdown, run the double-loop TDD cycle:
 1. **Tests first** — acceptance test (outer loop, RED), then unit tests (inner loop, RED).
 2. **Code** — minimal code to green, then refactor.
-3. **Review** — `critique-loop` review-only flow on the stage diff; resolve asks.
+3. **Review** — `critique-loop` review-only flow on the stage diff with slug `<slug>-stage-N`; resolve asks. This is a navigator-only review, **not** a phase gate — it has no Plannotator developer-review leg.
 4. **Proceed** — mark the stage's task done, move on.
 
-After the final stage, run one `critique-loop` review of the whole feature diff. Handle its verdict exactly as the flowchart dictates — resolve `CHANGES_REQUESTED`, surface `BLOCK`. On APPROVE, produce a summary report: the feature branch is then ready for the developer to open a PR or merge. Opening and merging the PR is out of scope — see `babysit-pr`.
+After the final stage, run one `critique-loop` review of the whole feature diff with slug `<slug>-final`. Handle its verdict exactly as the flowchart dictates — resolve `CHANGES_REQUESTED`, surface `BLOCK`. On APPROVE, produce a summary report: the feature branch is then ready for the developer to open a PR or merge. Opening and merging the PR is out of scope — see `babysit-pr`.
 
 ## Gate-decision flowchart
 
@@ -116,6 +116,19 @@ docs/features/<slug>/
 ```
 
 Commit artifacts with `docs:` conventional commits. `critique-loop`'s `.critique-loop/` scratch stays gitignored.
+
+## Calling critique-loop
+
+`gzship` invokes `critique-loop`'s review-only flow several times on one branch. `critique-loop` names its session and artifact files from a slug — by default the branch name. If every call reused the branch name, each review would overwrite the previous one's files. So pass a **distinct slug** to each invocation:
+
+| Call | Slug |
+|---|---|
+| Phase 2 — scenarios review | `<slug>-scenarios` |
+| Phase 4 — design review | `<slug>-design` |
+| Phase 5 — stage N review | `<slug>-stage-N` |
+| Phase 5 — final whole-diff review | `<slug>-final` |
+
+Each slug gets its own `critique-loop` session, so reviews stay independent and their artifacts do not collide.
 
 ## D2 handling
 
