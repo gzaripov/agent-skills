@@ -7,6 +7,11 @@ the feature, written before any architecture or code. A scenario is *a concrete
 example of system behavior from a user's perspective* — the spec, the acceptance
 criteria, and living documentation in one.
 
+`scenarios.md` is reviewed at the **Phase 2 gate**: a cross-model navigator — run
+through the `critique-loop` skill (e.g. Codex) — reviews it adversarially, and the
+developer must also approve it, before architecture begins. Write it to survive
+that review.
+
 This file has two parts: **Rules** that every scenario must obey, and
 **Recommendations** applied with judgment. Follow the rules always; reach for the
 recommendations when they fit.
@@ -15,21 +20,24 @@ recommendations when they fit.
 
 A scenario that breaks one of these is defective; fix it before the gate.
 
-1. **One scenario, one behavior.** A scenario illustrates exactly one rule. If it
+1. **State the feature's product reason.** Open the `Feature` with *why* it exists
+   — who it serves and the business value it delivers — not just what it does.
+   Without the "why", the scenario set cannot be scoped or judged.
+2. **One scenario, one behavior.** A scenario illustrates exactly one rule. If it
    needs a second `When`→`Then` pair, or its title needs "and", split it.
-2. **Describe behavior, never mechanics.** State *what* the product does, not *how*
+3. **Describe behavior, never mechanics.** State *what* the product does, not *how*
    a user or the code achieves it. No clicks, keystrokes, field names, CSS
    selectors, URLs, or HTTP verbs in the scenario.
-3. **`Given` = state, `When` = one action, `Then` = an observable outcome.** Exactly
+4. **`Given` = state, `When` = one action, `Then` = an observable outcome.** Exactly
    one triggering `When` per scenario. `Given` establishes prior context; `Then`
    states the visible result.
-4. **`Then` asserts only what a user or stakeholder can observe.** Never assert
+5. **`Then` asserts only what a user or stakeholder can observe.** Never assert
    implementation internals — database rows, log lines, status codes, private
    state, framework calls.
-5. **Use the domain's ubiquitous language.** Every noun and verb is a business term
+6. **Use the domain's ubiquitous language.** Every noun and verb is a business term
    shared by business, development, and testing — the same words the design and
    code will use.
-6. **Each scenario stands alone.** It is understandable by someone who has never
+7. **Each scenario stands alone.** It is understandable by someone who has never
    seen the feature, depends on no other scenario's leftover state, and passes in
    any order.
 
@@ -52,13 +60,16 @@ A scenario that breaks one of these is defective; fix it before the gate.
 
 ## Writing the Gherkin
 
-A `Feature` with a short narrative, then `Scenario` blocks of `Given` / `When` /
-`Then`. Extra `And` lines are fine for setup or compound outcomes; a second `When`
-means a second scenario.
+A `Feature` opens with its **product reason** — who it serves and *why* it matters
+(Rule 1) — then `Scenario` blocks of `Given` / `When` / `Then`. Extra `And` lines
+are fine for setup or compound outcomes; a second `When` means a second scenario.
 
 ```gherkin
 Feature: Gift card checkout
-  Shoppers can pay with a gift card balance.
+
+  Shoppers receive gift cards but today cannot spend them online — the balance
+  sits unredeemed and they drop out at the payment step. Accepting a gift card
+  at checkout recovers that lost sale and draws down outstanding liability.
 
   Scenario: Gift card covers the full order
     Given a shopper with a gift card worth 50 USD
@@ -67,19 +78,18 @@ Feature: Gift card checkout
     Then the order is confirmed
     And the remaining gift card balance is 10 USD
 
-  Scenario Outline: Insufficient gift card balance
-    Given a shopper with a gift card worth <balance> USD
-    And a cart totalling <total> USD
+  Scenario: Gift card does not cover the order
+    Given a shopper with a gift card worth 30 USD
+    And a cart totalling 40 USD
     When the shopper pays with the gift card
-    Then the shopper is asked to cover the remaining <shortfall> USD
-
-    Examples:
-      | balance | total | shortfall |
-      | 30      | 40    | 10        |
-      | 0       | 25    | 25        |
+    Then the shopper is asked to cover the remaining 10 USD
 ```
 
-**Declarative beats imperative** — Rule 2 in practice. An imperative scenario
+Keep each scenario as plain `Given`/`When`/`Then` text. When *one* behavior spans
+many inputs, a `Scenario Outline` with an `Examples` table avoids copy-paste — but
+reach for it only then (see Recommendations); plain scenarios are the default.
+
+**Declarative beats imperative** — Rule 3 in practice. An imperative scenario
 scripts the UI; it breaks on any redesign and hides the intent:
 
 ```gherkin

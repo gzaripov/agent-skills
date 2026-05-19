@@ -4,7 +4,10 @@
 
 Phase 5 turns the approved `design.md` into shipped code, one stage at a time, with
 tests written first. Read this file before the first stage, then run the per-stage
-cycle for every stage in the design's implementation stage breakdown.
+cycle for every stage in the design's implementation stage breakdown. Every stage's
+diff — and the whole feature at the end — is reviewed by a cross-model navigator,
+run through the `critique-loop` skill (e.g. Codex); see *The per-stage cycle* and
+*Final review*.
 
 It has two parts: **Rules** every stage must obey, and **Recommendations** applied
 with judgment.

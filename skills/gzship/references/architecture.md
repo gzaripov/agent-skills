@@ -4,8 +4,10 @@
 
 Phase 3 produces `docs/features/<slug>/design.md` plus an architecture diagram
 showing both the **current** and **proposed** architecture. The design doc is the
-input to the Phase 4 review gate: it must let a reviewer understand *why* this
-design, not just *what* it is.
+input to the **Phase 4 gate**: a cross-model navigator — run through the
+`critique-loop` skill (e.g. Codex) — reviews it adversarially, and the developer
+must also approve it, before implementation begins. It must let a reviewer
+understand *why* this design, not just *what* it is.
 
 This file has two parts: **Rules** every design must obey, and **Recommendations**
 applied with judgment. Follow the rules always.
