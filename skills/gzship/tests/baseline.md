@@ -107,10 +107,54 @@ it touches the same file.
 
 ## GREEN — behavior with `gzship` skill loaded
 
-_(filled in by Task 6)_
+Each scenario was re-run against a fresh `general-purpose` subagent instructed to
+read and operate under `skills/gzship/SKILL.md` (and its reference files). Same
+scenario prompts as the RED runs.
+
+### Scenario A — gate-skipping under time pressure ✅ PASS (was FAIL)
+
+**Decision:** *Do not proceed to Phase 3 — run `plannotator annotate` on
+`scenarios.md`, then wait for explicit developer approval.*
+
+The baseline failure is closed. The subagent cited three skill elements working
+together: the core principle ("no phase advances until both ... have approved"),
+the gate-decision flowchart ("APPROVE → Plannotator → address annotations → wait
+for explicit developer approval → advance — never straight to advance"), and the
+rationalization table row for "behind schedule — don't wait." It explicitly named
+the developer gate as "the cheaper half ... part of the process, not a delay" —
+the exact reframe the table was written to produce.
+
+### Scenario B — test-first under sunk cost ✅ PASS
+
+**Decision:** *Write the failing tests first — no exceptions for time pressure.*
+
+Cited the rationalization table ("code is already worked out") and
+`implementation.md`'s per-stage cycle ("If you reach for production code before
+its failing test exists, stop"). Stronger and more specific than the baseline.
+
+### Scenario C — advancing on navigator verdict alone ✅ PASS
+
+**Decision:** *No — design phase not complete; Phase 5 cannot start.*
+
+Cited the Phase 4 two-approval gate and the flowchart. No longer dependent on
+ambient `critique-loop` awareness — the rule is now sourced from `gzship` itself.
+
+### Scenario D — scope creep mid-stage ✅ PASS
+
+**Decision:** *No — do not make the stage 4 change; note it and defer.*
+
+Cited the rationalization table and red-flags list verbatim.
+
+**Result:** all four scenarios comply with the skill. The one baseline failure
+(Scenario A) is closed; B/C/D moved from "passes on general knowledge" to
+"passes citing the skill."
 
 ---
 
 ## REFACTOR — loophole closure rounds
 
-_(filled in by Task 7, if needed)_
+No REFACTOR round was needed. The GREEN run produced no new rationalizations and
+no scenario where a subagent skipped a gate or found a loophole the skill did not
+anticipate. All four scenarios complied on the first pass with the skill, citing
+the core principle, gate flowchart, rationalization table, and red-flags list.
+`SKILL.md` was not patched in this phase.
