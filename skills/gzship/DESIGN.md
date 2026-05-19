@@ -11,6 +11,7 @@ A **Claude-Code-first** skill that carries a single feature from a **BDD scenari
 - **In scope:** one feature at a time, from idea to merged-ready code on a feature branch.
 - **Non-goals:** opening/merging PRs (that is `babysit-pr`), running the cross-model review engine itself (that is `critique-loop`), multi-feature program planning.
 - **Claude-Code-first trade-off:** unlike the other skills in this repo, `gzship` has **no `cursor/` or `codex/` variants**. It deliberately depends on Claude Code subagents (the `Agent` tool) and task tracking. This trades repo-wide portability for richer orchestration — an explicit user decision.
+- **Dependencies:** the `critique-loop` skill (cross-model review engine), the `plannotator` CLI (developer-review UI at the phase gates), and optionally the `d2` binary (diagram rendering).
 
 ## Skill structure
 
@@ -38,7 +39,7 @@ Derive a kebab-case `<slug>` from the feature request. Create `docs/features/<sl
 ### Phase 2 — Scenario Review Gate
 1. Run `critique-loop`'s **review-only flow** against `scenarios.md` — the navigator reviews adversarially.
 2. Resolve code/scope-level asks directly; surface product-level asks to the developer.
-3. **Developer reviews and explicitly approves.**
+3. **Developer review via Plannotator.** Open `scenarios.md` in Plannotator (`plannotator annotate`) so the developer annotates it directly in the browser; address every returned annotation. The phase advances only on explicit developer approval.
    Both the navigator verdict and the developer approval are required before Phase 3.
 
 ### Phase 3 — Architecture & Design
@@ -47,7 +48,7 @@ Derive a kebab-case `<slug>` from the feature request. Create `docs/features/<sl
 3. Write `docs/features/<slug>/design.md`: components & interfaces, data flow, error handling, tradeoffs considered, and the **implementation stage breakdown**. Embed the rendered diagrams.
 
 ### Phase 4 — Design Review Gate
-Same shape as Phase 2: `critique-loop` review-only on `design.md`, resolve asks, surface architecture/product tradeoffs to the developer, **developer approves**. Both approvals required before Phase 5.
+Same shape as Phase 2: `critique-loop` review-only on `design.md`, resolve asks, surface architecture/product tradeoffs to the developer, then **developer review via Plannotator** (`plannotator annotate design.md`) — address every returned annotation, advance only on explicit approval. Both approvals required before Phase 5.
 
 ### Phase 5 — Staged Implementation
 For each stage in the design's stage breakdown, run the **double-loop TDD** cycle:
@@ -60,7 +61,7 @@ For each stage in the design's stage breakdown, run the **double-loop TDD** cycl
 
 ## How reviews work — `critique-loop` integration
 
-`gzship` never re-implements review logic. Every gate calls `critique-loop`'s **review-only flow** against the relevant artifact or diff. The navigator configuration (Codex vs. Cursor, model, reasoning effort) belongs to `critique-loop`; `gzship` only hands it the artifact/diff range. The two phase gates additionally include a **developer approval** step, which `critique-loop`'s review-only flow does not provide — `gzship` adds that explicitly.
+`gzship` never re-implements review logic. Every gate calls `critique-loop`'s **review-only flow** against the relevant artifact or diff. The navigator configuration (Codex vs. Cursor, model, reasoning effort) belongs to `critique-loop`; `gzship` only hands it the artifact/diff range. The two phase gates additionally include a **developer review** step, which `critique-loop`'s review-only flow does not provide — `gzship` runs that through **Plannotator** (`plannotator annotate <artifact>`), so the developer annotates the artifact in a browser UI rather than via inline chat. `gzship` addresses every returned annotation and advances only on explicit developer approval.
 
 ## Artifacts
 
