@@ -2,29 +2,59 @@
 
 ## Purpose
 
-Phase 1 produces `docs/features/<slug>/scenarios.md`: the behavioral contract for the feature. This file is the standard that artifact is held to. Use it while synthesizing the `Explore` survey and writing scenarios — every scenario should be declarative, expressed in the domain's language, and pin exactly one observable behavior. Scenarios describe *what the product does for whom*, never *how the code achieves it*.
+Phase 1 produces `docs/features/<slug>/scenarios.md`: the behavioral contract for
+the feature, written before any architecture or code. A scenario is *a concrete
+example of system behavior from a user's perspective* — the spec, the acceptance
+criteria, and living documentation in one.
 
-## Discover before you write
+This file has two parts: **Rules** that every scenario must obey, and
+**Recommendations** applied with judgment. Follow the rules always; reach for the
+recommendations when they fit.
 
-Scenarios are *discovered*, not invented at a keyboard.
+## Rules — always
 
-- **Three Amigos.** Good scenarios come from three perspectives — business (what problem), development (what is buildable), testing (what could break). When working solo, deliberately wear all three hats: state the business value, sanity-check feasibility, and hunt for the edge case that breaks it.
-- **Example Mapping.** Break the feature into *rules*, then make each rule concrete with *examples*. Every unanswered example is a *question* — surface it rather than guessing. One scenario per example; one example per rule until a rule needs several.
-- **Survey first.** Phase 1 dispatches `Explore` subagents for a reason: scenarios that ignore the existing system get rejected at the gate. Know what already exists, what the feature touches, and what it conflicts with before writing a single `Given`.
+A scenario that breaks one of these is defective; fix it before the gate.
 
-`scenarios.md` must end with a **"How it lands in the product"** section synthesized from that survey:
+1. **One scenario, one behavior.** A scenario illustrates exactly one rule. If it
+   needs a second `When`→`Then` pair, or its title needs "and", split it.
+2. **Describe behavior, never mechanics.** State *what* the product does, not *how*
+   a user or the code achieves it. No clicks, keystrokes, field names, CSS
+   selectors, URLs, or HTTP verbs in the scenario.
+3. **`Given` = state, `When` = one action, `Then` = an observable outcome.** Exactly
+   one triggering `When` per scenario. `Given` establishes prior context; `Then`
+   states the visible result.
+4. **`Then` asserts only what a user or stakeholder can observe.** Never assert
+   implementation internals — database rows, log lines, status codes, private
+   state, framework calls.
+5. **Use the domain's ubiquitous language.** Every noun and verb is a business term
+   shared by business, development, and testing — the same words the design and
+   code will use.
+6. **Each scenario stands alone.** It is understandable by someone who has never
+   seen the feature, depends on no other scenario's leftover state, and passes in
+   any order.
 
-- **What already exists** — current behavior, modules, and patterns in this area.
-- **What the feature touches** — the modules, flows, and seams it extends or modifies.
-- **What it conflicts with** — existing behavior it changes or contradicts, and open questions for the developer.
+## Recommendations — apply with judgment
 
-## Scenario structure
+- **Discover before you formulate.** Run the feature through the Three Amigos
+  (business / development / testing perspectives — wear all three when solo) and
+  Example Mapping (rules → examples → open questions) *before* writing Gherkin.
+- **`Scenario Outline` for one behavior across an input table** — same rule, varied
+  data. Use *separate* scenarios when the cases exercise *different* rules.
+- **`Background` only for setup that is short, genuinely common, and needed to
+  understand every scenario** in the file. Otherwise inline it.
+- **Keep scenarios short** — aim 3–5 steps, rarely above ~10. A long scenario
+  usually hides multiple behaviors or incidental detail.
+- **Prefer named personas and concrete, stable data** ("a gift card worth 50 USD")
+  over abstract or incidental values.
+- **Title the scenario with the rule it illustrates**, not "Test X".
+- **Cover the representative cases** — the happy path plus the boundaries that
+  change behavior — not every permutation.
 
-Use Gherkin: a `Feature` with a short narrative, then `Scenario` blocks of `Given` (context) / `When` (the event) / `Then` (the observable outcome).
+## Writing the Gherkin
 
-- **One observable behavior per scenario.** If the title needs "and", split it.
-- **`Given` sets state, `When` is the single trigger, `Then` is the visible result.** Extra `And` is fine for setup or compound outcomes; a second `When` means a second scenario.
-- **`Scenario Outline` + `Examples`** for the same behavior across an input table — one outline, many rows, no copy-paste.
+A `Feature` with a short narrative, then `Scenario` blocks of `Given` / `When` /
+`Then`. Extra `And` lines are fine for setup or compound outcomes; a second `When`
+means a second scenario.
 
 ```gherkin
 Feature: Gift card checkout
@@ -49,49 +79,53 @@ Feature: Gift card checkout
       | 0       | 25    | 25        |
 ```
 
-## Declarative, not imperative
-
-This is the single most important habit. An *imperative* scenario scripts the UI — clicks, field names, buttons. It is brittle (a redesign breaks it), it hides the intent under mechanics, and it cannot be read by the business. A *declarative* scenario states the behavior and lets the implementation choose the mechanics.
-
-**Imperative — UI-coupled, avoid:**
+**Declarative beats imperative** — Rule 2 in practice. An imperative scenario
+scripts the UI; it breaks on any redesign and hides the intent:
 
 ```gherkin
+# Imperative — UI-coupled, avoid:
 Scenario: Apply a discount code
   Given I open the "/cart" page
   When I type "SAVE10" into the field with id "promo-input"
   And I click the "Apply" button
-  And I wait for the "#total" element to update
   Then the "#total" element shows "$45.00"
-```
 
-**Declarative — business behavior, prefer:**
-
-```gherkin
+# Declarative — business behavior, prefer:
 Scenario: A valid discount code reduces the order total
   Given a cart totalling 50 USD
   When the shopper applies the discount code "SAVE10"
   Then the order total is reduced by 10 percent
 ```
 
-The second version survives a UI rewrite, reads as a business rule, and states *why* the number changed instead of asserting a magic string.
-
-## Ubiquitous language
-
-Write scenarios in the vocabulary the domain experts use — the same terms that appear in the design and the code. If the business says "shopper", "cart", and "discount code", the scenario says exactly that. Keep implementation terms (`POST /api/v2/orders`, `OrderRepository`, table names, HTTP status codes, CSS selectors) out of scenarios entirely — they belong in the design and the code, not the behavioral contract. A consistent shared vocabulary is what lets the scenario double as the spec.
-
 ## Anti-patterns
 
-| Anti-pattern | Why it hurts | Fix |
+| Smell | Why it hurts | Fix |
 |---|---|---|
-| Imperative / UI-coupled steps (clicks, field IDs, selectors) | Breaks on any UI change; hides intent behind mechanics; unreadable by the business | State the behavior; let the implementation pick the mechanics |
-| Multiple behaviors in one scenario | A failure does not localize; the title needs "and"; the scenario can't be reasoned about | Split into one scenario per observable behavior |
-| Incidental detail | Noise (exact timestamps, unrelated fields) obscures what actually drives the outcome | Keep only the data the `Then` depends on; push the rest to background or defaults |
-| Conjunction steps ("And X and Y…") | One step does two things, so a failure is ambiguous and the step can't be reused | One action or fact per step; chain separate `And` lines |
-| Asserting implementation, not behavior | Couples the spec to internals (DB rows, status codes, log lines); refactors fail it falsely | Assert the outcome a user or stakeholder can observe |
+| Imperative / UI-coupled steps (clicks, field IDs, selectors) | Breaks on any UI change; hides intent; unreadable by the business | State the behavior; push mechanics into step definitions |
+| Multiple behaviors in one scenario | A failure doesn't localize; the title needs "and" | One scenario per observable behavior |
+| Incidental detail | Noise (timestamps, unrelated fields) obscures what drives the outcome | Keep only data the `Then` depends on |
+| Conjunction steps ("Given X and Y and Z") | One step does several things; failures are ambiguous | One fact or action per step; chain separate `And` lines |
+| Asserting implementation, not behavior | Couples the spec to internals; refactors fail it falsely | Assert an outcome a user or stakeholder can observe |
+| Scripting instead of specifying | A click-by-click walkthrough, not an example of behavior | Rewrite as *what* outcome, not *what sequence* |
+| Order-dependent scenarios | Scenario B passes only if A ran first | Each scenario sets up its own state |
+| "Test X" titles | The title names a mechanic, not a rule | Title the behavior being illustrated |
+
+## "How it lands in the product"
+
+`scenarios.md` must end with a **"How it lands in the product"** section,
+synthesized from the Phase 1 survey:
+
+- **What already exists** — current behavior, modules, and patterns in this area.
+- **What the feature touches** — the modules, flows, and seams it extends.
+- **What it conflicts with** — existing behavior it changes, and open questions for
+  the developer. Scenarios that ignore the existing system get rejected at the gate.
 
 ## Sources
 
-- *BDD in Action* — John Ferguson Smart: declarative scenarios, ubiquitous language, outside-in flow.
-- *Specification by Example* — Gojko Adzic: scenarios as living, executable specifications.
-- *Discovery: Explore behaviour using examples* — Seb Rose & Gáspár Nagy: Three Amigos, Example Mapping.
-- *The Cucumber Book* — Matt Wynne & Aslak Hellesøy: Gherkin structure, scenario outlines, anti-patterns.
+- *BDD in Action* — John Ferguson Smart: declarative scenarios, ubiquitous language.
+- *Specification by Example* — Gojko Adzic: scenarios as living, executable specs.
+- *Discovery* / *Formulation* — Seb Rose & Gáspár Nagy: the Discovery → Formulation
+  → Automation practices, Example Mapping.
+- *The Cucumber Book* — Wynne & Hellesøy; Cucumber docs *Writing better Gherkin* /
+  *Anti-patterns*: Gherkin structure, declarative style, scenario smells.
+- Dan North, *Introducing BDD*; Liz Keogh on acceptance criteria vs. scenarios.
