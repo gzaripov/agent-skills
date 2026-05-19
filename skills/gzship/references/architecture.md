@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Phase 3 produces `docs/features/<slug>/design.md` plus one `diagrams/architecture.d2`
-holding both the **current** and **proposed** architecture. This file is the standard
-that work is held to. Use it while dispatching the architecture survey, drawing the D2
-diagrams, and writing the design doc — survey the system as it *is* before proposing
-how it *should* change, and express both states in a single diagram.
+Phase 3 produces `docs/features/<slug>/design.md` plus an architecture diagram (in
+`diagrams/`) showing both the **current** and **proposed** architecture. This file is
+the standard that work is held to. Use it while dispatching the architecture survey,
+drawing the diagrams, and writing the design doc — survey the system as it *is* before
+proposing how it *should* change, and show both states.
 
 ## Survey the existing architecture first
 
@@ -57,139 +57,101 @@ The survey fans out — do not read the whole codebase serially in the main cont
 4. **Feed the synthesis into both deliverables** — it becomes the *current* state of
    `architecture.d2` and the opening context of `design.md`.
 
-## D2 diagramming
+## Diagramming — draft both tools, render both, choose
 
-Architecture diagrams in `gzship` are written in [D2](https://d2lang.com) and live in
-`docs/features/<slug>/diagrams/architecture.d2`.
+`gzship` is not tied to one diagram tool. For the architecture diagram, **draft it in
+both D2 and Mermaid, render each, look at the two renders, and keep whichever reads
+more clearly for this feature.** Neither tool wins every time:
 
-### Install check and fallback
+- **D2** — stronger auto-layout for dense graphs and nested containers; one file can
+  hold both the current and proposed states (`layers` / `scenarios`). Needs the `d2`
+  binary, and GitHub does not render `.d2` — the rendered SVG must be committed and
+  embedded.
+- **Mermaid** — GitHub and most markdown viewers render a fenced ` ```mermaid ` block
+  inline, so the diagram needs no committed image and stays in `design.md` as text.
+  Cleaner default shapes for simple flows; but it wraps long labels aggressively and
+  has no current-vs-proposed board (use two diagrams).
 
-Phase 3 runs the install check before rendering:
+Diagram sources live in `docs/features/<slug>/diagrams/`.
 
-```sh
-d2 --version
-```
+### D2
 
-- **If `d2` is installed** — render the `.d2` to SVG (see *Render and commit* below).
-- **If `d2` is missing** — offer to install it:
-  - `brew install d2` (macOS / Linux with Homebrew), or
-  - the official install script: `curl -fsSL https://d2lang.com/install.sh | sh -`
-- **If the developer declines to install** — fall back to **source only**: commit the
-  `architecture.d2` file and embed its contents as a fenced ```d2 code block inside
-  `design.md`. The diagram is still reviewable as source; only the rendered SVG is
-  skipped.
+Install check: `d2 --version`. If missing, offer `brew install d2` or
+`curl -fsSL https://d2lang.com/install.sh | sh -`.
 
-### D2 syntax for architecture diagrams
+Syntax essentials:
 
-D2 is a declarative diagram language. The pieces you need:
+- **Shape** — `api: API Gateway`, or `db: Postgres { shape: cylinder }`. Pick a
+  fitting shape: a plain rectangle for a normal module, a cylinder only for a
+  datastore.
+- **Container** — dotted keys or nested braces group shapes: `backend.api` and
+  `backend.worker` sit inside a drawn `backend` box.
+- **Connection** — `a -> b: label`; `--` undirected, `<->` bidirectional; edges may
+  cross containers.
+- **Two states in one file** — `scenarios` blocks each inherit the base and add or
+  override on top (use when proposed builds on current); `layers` blocks are
+  independent boards (use when current and proposed share no structure, e.g. a
+  greenfield repo).
 
-- **Shapes** — a bare identifier declares a node. `label` and `shape` set its text and
-  form: `api: API Gateway`, or `db: Postgres { shape: cylinder }`.
-- **Nested containers** — dotted keys or nested braces group shapes. `backend.api` and
-  `backend.worker` both live inside the `backend` container; the container is drawn as
-  a labeled box around its children.
-- **Connections with labels** — `a -> b: label` draws a directed edge with text. Use
-  `--` for undirected, `<->` for bidirectional. Connections may cross containers:
-  `frontend.web -> backend.api: HTTP`.
-- **The `scenarios` keyword** — `scenarios` lets one file hold a **base diagram** plus
-  named **scenario blocks**. Each scenario *inherits the entire base* and then applies
-  its own additions and overrides on top. A scenario that names an existing shape
-  modifies it; a scenario that names a new shape adds it. The base is left untouched.
-  In `gzship` the base diagram is the **CURRENT** architecture and a `proposed`
-  scenario is the **PROPOSED** architecture — one file, both states, no duplication.
-
-### Complete runnable example
-
-A base diagram (current architecture) plus a `proposed` scenario that adds a cache and
-reroutes a connection:
-
-```d2
-# architecture.d2 — base = CURRENT, scenario "proposed" = PROPOSED
-
-direction: right
-
-client: Web Client
-
-backend: Backend Service {
-  api: HTTP API
-  orders: Order Logic
-}
-
-db: Orders DB {
-  shape: cylinder
-}
-
-client -> backend.api: request
-backend.api -> backend.orders: dispatch
-backend.orders -> db: read / write
-
-scenarios: {
-  proposed: {
-    # Add a new component — read-through cache.
-    cache: Order Cache {
-      shape: hexagon
-    }
-
-    # Reroute: order logic now checks the cache first.
-    backend.orders -> cache: lookup
-    cache -> db: miss → fetch
-
-    # Override an existing shape from the base.
-    db.label: Orders DB (read replica added)
-  }
-}
-```
-
-Rendering this file produces two diagrams: the base (current — client → backend → db)
-and the `proposed` scenario (current plus the `cache` node and its new edges).
-
-## Render, embed, and commit
-
-**Always render the diagram yourself — never hand the developer a raw `.d2`
-file.** With `d2` installed, render each board to its own SVG with `--target`.
-`--target ''` selects the base board (the current architecture);
-`--target 'scenarios.<name>'` selects a named scenario (the proposed
-architecture):
+Render each board to its own SVG with `--target` — `''` for the base/current board,
+`scenarios.<name>` or `layers.<name>` for the proposed board:
 
 ```sh
 D=docs/features/<slug>/diagrams
-d2 --target ''                   "$D/architecture.d2" "$D/architecture-current.svg"
-d2 --target 'scenarios.proposed' "$D/architecture.d2" "$D/architecture-proposed.svg"
+d2 --target ''                "$D/architecture.d2" "$D/architecture-current.svg"
+d2 --target 'layers.proposed' "$D/architecture.d2" "$D/architecture-proposed.svg"
 ```
 
-A plain `d2 architecture.d2 architecture.svg` with no `--target` instead produces a
-single SVG holding every board with interactive navigation between them. That is handy
-for browsing but does not emit the two separate files the artifact set expects — use
-the two `--target` calls above.
+### Mermaid
 
-**Look at what you rendered — a diagram you have not seen is not done.** Render
-each board to PNG as well and open it (you can read image files), then judge it as a
-reader would:
+Render check: `mmdc --version`, or run it on demand with `npx -y
+@mermaid-js/mermaid-cli`. A `flowchart` is the usual fit:
+
+- **Node shapes** — `id["box"]`, `id(["pill / actor"])`, `id{{"hexagon"}}`,
+  `id[("cylinder")]`.
+- **Edge with label** — `a -- "label" --> b`.
+- **Line breaks** — use `<br/>` inside a label and keep each line short; Mermaid
+  auto-wraps long lines at awkward points.
+- **Two states** — write the current and proposed flows as two separate
+  ` ```mermaid ` blocks; Mermaid has no board concept.
+
+Render to PNG to inspect it:
+
+```sh
+npx -y @mermaid-js/mermaid-cli -i "$D/architecture.mmd" -o /tmp/arch.png -s 2
+```
+
+### Look at what you rendered — and compare
+
+A diagram you have not seen is not done. Render **both** the D2 and the Mermaid
+version to PNG and open them (you can read image files). Judge each as a reader would:
 
 - no oversized or near-empty shapes; no node far larger than its content;
 - no overlapping nodes or labels; no clipped or cramped text;
 - few edge crossings; related nodes sit close together;
-- the layout is balanced — content is not jammed into one corner with dead space
-  elsewhere.
+- the layout is balanced — not jammed into one corner with dead space elsewhere.
 
-If it looks bad, fix the `.d2` and re-render. Iterate until it reads cleanly. Common
-fixes: choose a fitting shape (a plain rectangle, not a cylinder, for a non-database
-module); change `direction`; drop disconnected nodes; and use `layers` instead of
-`scenarios` when the current and proposed boards share no structure (e.g. a greenfield
-repo) — `layers` are independent boards, rendered with `--target 'layers.<name>'`.
+Fix the source and re-render until each reads cleanly. Then **pick the tool whose
+render is clearer for this feature** — that one becomes the diagram.
 
-**Embed the rendered SVGs inline in `design.md`** with markdown image syntax, so
-the developer sees the diagrams in the document itself — do not merely link to
-them:
+## Embed and commit
 
-```markdown
-![Current architecture](./diagrams/architecture-current.svg)
-![Proposed architecture](./diagrams/architecture-proposed.svg)
-```
+Embed the **chosen** diagram in `design.md` so the design doc is self-contained:
 
-Commit **the `.d2` source and both rendered `.svg` files** with a `docs:`
-conventional commit. If `d2` was unavailable, commit the `.d2` source only and embed
-it fenced in `design.md` per the fallback above.
+- **Mermaid chosen** — paste the diagram into `design.md` as a fenced ` ```mermaid `
+  block (current and proposed each as their own block). GitHub renders it inline; no
+  image artifact is needed. Keep the source as `diagrams/architecture.mmd` as well.
+- **D2 chosen** — embed the rendered SVGs with markdown image syntax (never a raw
+  `.d2`), and commit the `.d2` source plus both `.svg` files:
+
+  ```markdown
+  ![Current architecture](./diagrams/architecture-current.svg)
+  ![Proposed architecture](./diagrams/architecture-proposed.svg)
+  ```
+
+Commit the diagram with a `docs:` conventional commit. If neither tool can be
+installed, fall back to committing the diagram source and embedding it as a fenced
+code block so it is at least reviewable as text.
 
 ## The design document
 
@@ -212,13 +174,14 @@ review gate. It must contain:
   one double-loop TDD cycle. This breakdown drives Phase 5; if it has **5 or more
   stages**, each stage is dispatched to its own fresh subagent.
 
-Embed the rendered current and proposed diagrams (or the fenced `.d2` source under the
-fallback) so the design doc is self-contained for review.
+Embed the chosen diagram — a ` ```mermaid ` block, or the rendered D2 SVGs — so the
+design doc is self-contained for review.
 
 ## Sources
 
 - *Working Effectively with Legacy Code* — Michael Feathers: seams, characterization
   tests, understanding existing/untested code before changing it.
-- D2 — Terrastruct: declarative diagram language, the `scenarios` keyword for
-  base-plus-override diagrams, and install/render tooling
-  ([terrastruct.com](https://terrastruct.com) / [d2lang.com](https://d2lang.com)).
+- D2 — Terrastruct: declarative diagram language, `scenarios` / `layers` for
+  multi-board diagrams ([d2lang.com](https://d2lang.com)).
+- Mermaid: markdown-native diagram language rendered inline by GitHub and most
+  viewers ([mermaid.js.org](https://mermaid.js.org)).

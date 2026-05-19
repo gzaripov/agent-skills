@@ -2,8 +2,8 @@
 name: gzship
 description: Use when building a feature end-to-end, taking an idea or product request from a BDD scenario through to shipped code, or doing BDD/TDD feature work on a feature branch.
 license: MIT
-compatibility: Claude Code only — uses subagents (the Agent tool) and task tracking, with no cursor/codex variant. Requires the `critique-loop` skill and the `plannotator` CLI installed; the `d2` binary is optional (diagram rendering). Run from inside a git repository, on a feature branch (not `main`/`master`).
-allowed-tools: Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git rev-parse *) Bash(git branch --show-current) Bash(mkdir -p docs/features/*) Bash(d2 *) Bash(plannotator --help) Bash(plannotator annotate *) Agent
+compatibility: Claude Code only — uses subagents (the Agent tool) and task tracking, with no cursor/codex variant. Requires the `critique-loop` skill and the `plannotator` CLI installed; the `d2` binary and `mermaid-cli` are optional diagram renderers (at least one recommended). Run from inside a git repository, on a feature branch (not `main`/`master`).
+allowed-tools: Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git rev-parse *) Bash(git branch --show-current) Bash(mkdir -p docs/features/*) Bash(d2 *) Bash(mmdc *) Bash(npx -y @mermaid-js/mermaid-cli*) Bash(plannotator --help) Bash(plannotator annotate *) Agent
 ---
 
 Carry one feature from a BDD scenario, through architecture and design, into a staged TDD implementation on a feature branch. Outside-in: behavior first, architecture second, code last.
@@ -41,7 +41,7 @@ Dispatch parallel `Explore` subagents to survey where the feature lands and what
 ### Phase 3 — Architecture & Design
 **REQUIRED BACKGROUND:** `references/architecture.md` — read before surveying or diagramming.
 
-Dispatch parallel subagents to survey the existing architecture. Produce one `diagrams/architecture.d2` holding both the current and proposed states, **render it to SVGs yourself, look at the render to confirm it is readable and well laid out, and embed those SVGs inline in `design.md`** (never hand over a raw `.d2`, never embed a diagram you have not looked at) — see `references/architecture.md`. Write `docs/features/<slug>/design.md`: components, interfaces, data flow, error handling, tradeoffs, and the **implementation stage breakdown**.
+Dispatch parallel subagents to survey the existing architecture. Draft the architecture diagram in **both D2 and Mermaid**, render each, **look at both renders and keep whichever reads more clearly** (never embed a diagram you have not looked at) — see `references/architecture.md`. Embed the chosen diagram in `design.md`: a ` ```mermaid ` block (GitHub renders it inline) or the rendered D2 SVGs. Write `docs/features/<slug>/design.md`: components, interfaces, data flow, error handling, tradeoffs, and the **implementation stage breakdown**.
 
 ### Phase 4 — Design Review Gate (two approvals)
 Same shape as Phase 2:
