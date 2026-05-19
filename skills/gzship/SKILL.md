@@ -1,6 +1,6 @@
 ---
 name: gzship
-description: Use when building a feature end-to-end, taking an idea from a BDD scenario through to shipped code, doing BDD/TDD feature work, or when you want gated phases with both cross-model and developer review before each step advances.
+description: Use when building a feature end-to-end, taking an idea or product request from a BDD scenario through to shipped code, or doing BDD/TDD feature work on a feature branch.
 license: MIT
 compatibility: Claude Code only — uses subagents (the Agent tool) and task tracking, with no cursor/codex variant. Requires the `critique-loop` skill and the `plannotator` CLI installed; the `d2` binary is optional (diagram rendering). Run from inside a git repository, on a feature branch (not `main`/`master`).
 allowed-tools: Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git rev-parse *) Bash(git branch --show-current) Bash(mkdir -p docs/features) Bash(d2 *) Bash(plannotator annotate *) Agent
