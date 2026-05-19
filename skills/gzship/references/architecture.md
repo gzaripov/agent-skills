@@ -162,6 +162,22 @@ single SVG holding every board with interactive navigation between them. That is
 for browsing but does not emit the two separate files the artifact set expects — use
 the two `--target` calls above.
 
+**Look at what you rendered — a diagram you have not seen is not done.** Render
+each board to PNG as well and open it (you can read image files), then judge it as a
+reader would:
+
+- no oversized or near-empty shapes; no node far larger than its content;
+- no overlapping nodes or labels; no clipped or cramped text;
+- few edge crossings; related nodes sit close together;
+- the layout is balanced — content is not jammed into one corner with dead space
+  elsewhere.
+
+If it looks bad, fix the `.d2` and re-render. Iterate until it reads cleanly. Common
+fixes: choose a fitting shape (a plain rectangle, not a cylinder, for a non-database
+module); change `direction`; drop disconnected nodes; and use `layers` instead of
+`scenarios` when the current and proposed boards share no structure (e.g. a greenfield
+repo) — `layers` are independent boards, rendered with `--target 'layers.<name>'`.
+
 **Embed the rendered SVGs inline in `design.md`** with markdown image syntax, so
 the developer sees the diagrams in the document itself — do not merely link to
 them:
