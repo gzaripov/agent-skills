@@ -3,10 +3,17 @@ name: gzship
 description: Use when building a feature end-to-end, taking an idea or product request from a BDD scenario through to shipped code, or doing BDD/TDD feature work on a feature branch.
 license: MIT
 compatibility: Claude Code only — uses subagents (the Agent tool) and task tracking, with no cursor/codex variant. Requires the `critique-loop` skill and the `plannotator` CLI installed; the `d2` binary is optional (diagram rendering). Run from inside a git repository, on a feature branch (not `main`/`master`).
-allowed-tools: Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git rev-parse *) Bash(git branch --show-current) Bash(mkdir -p docs/features) Bash(d2 *) Bash(plannotator annotate *) Agent
+allowed-tools: Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git rev-parse *) Bash(git branch --show-current) Bash(mkdir -p docs/features/*) Bash(d2 *) Bash(plannotator annotate *) Agent
 ---
 
 Carry one feature from a BDD scenario, through architecture and design, into a staged TDD implementation on a feature branch. Outside-in: behavior first, architecture second, code last.
+
+## Prerequisites
+
+- The `critique-loop` skill is installed — it is the review engine for every gate.
+- The `plannotator` CLI is installed and runnable (`plannotator --help`) — it runs the developer-review gates.
+- The working directory is a git repository on a feature branch (not `main`/`master`).
+- `d2` is optional; see **D2 handling** for the fallback when it is absent.
 
 ## Core principle
 
@@ -34,11 +41,11 @@ Dispatch parallel `Explore` subagents to survey where the feature lands and what
 ### Phase 3 — Architecture & Design
 **REQUIRED BACKGROUND:** `references/architecture.md` — read before surveying or diagramming.
 
-Dispatch parallel subagents to survey the existing architecture. Produce two D2 diagrams (current + proposed) in one `diagrams/architecture.d2` using D2's `scenarios` keyword. Write `docs/features/<slug>/design.md`: components, interfaces, data flow, error handling, tradeoffs, and the **implementation stage breakdown**.
+Dispatch parallel subagents to survey the existing architecture. Produce one `diagrams/architecture.d2` holding both the current and proposed states (see `references/architecture.md` for the D2 syntax). Write `docs/features/<slug>/design.md`: components, interfaces, data flow, error handling, tradeoffs, and the **implementation stage breakdown**.
 
 ### Phase 4 — Design Review Gate (two approvals)
 Same shape as Phase 2:
-1. **Navigator review** — `critique-loop` review-only flow on `design.md`.
+1. **Navigator review** — `critique-loop` review-only flow on `design.md`. Resolve code/scope asks directly; surface architecture and product tradeoffs to the developer.
 2. **Developer review** — `plannotator annotate docs/features/<slug>/design.md`; address every annotation.
 3. Advance to Phase 5 only after both an APPROVE verdict and explicit developer approval.
 
@@ -51,7 +58,7 @@ For each stage in the design's breakdown, run the double-loop TDD cycle:
 3. **Review** — `critique-loop` review-only flow on the stage diff; resolve asks.
 4. **Proceed** — mark the stage's task done, move on.
 
-After the final stage, run one `critique-loop` review of the whole feature diff and produce a summary report.
+After the final stage, run one `critique-loop` review of the whole feature diff. Handle its verdict exactly as the flowchart dictates — resolve `CHANGES_REQUESTED`, surface `BLOCK`. On APPROVE, produce a summary report: the feature branch is then ready for the developer to open a PR or merge. Opening and merging the PR is out of scope — see `babysit-pr`.
 
 ## Gate-decision flowchart
 
@@ -103,7 +110,7 @@ If you catch yourself thinking any of these, a gate is about to be skipped:
 docs/features/<slug>/
   scenarios.md
   design.md
-  diagrams/architecture.d2          # current = base, proposed = D2 scenario
+  diagrams/architecture.d2          # current + proposed states in one file
   diagrams/architecture-current.svg
   diagrams/architecture-proposed.svg
 ```
