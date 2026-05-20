@@ -10,6 +10,7 @@ Each skill is self-contained, portable across tools, and installable individuall
 | --- | --- | --- |
 | [`babysit-pr`](./skills/babysit-pr) | Shipped | Watches an open PR until it's merge-ready — resolves bot review comments, fixes failing CI checks, and loops until all checks are green and no unanswered bot comments remain. |
 | [`critique-loop`](./skills/critique-loop) | Shipped | Cross-model critique loop with two entry points. **Full flow:** plan → navigator reviews plan → user approves → implement → navigator reviews diff. **Review-only flow:** skip planning/implementation; navigator adversarially reviews an existing diff. Navigator is pluggable: Codex CLI (default, `gpt-5.5` at xhigh effort) or Cursor CLI (`gpt-5.3-codex-xhigh`). All rounds share one navigator session (UUID-tracked) so context persists across phases. Claude fixes code/scope-level asks itself; product/architecture questions are surfaced to the user. Artifacts live in `.critique-loop/` — local-only, auto-added to `.gitignore` so they don't pollute the PR. |
+| [`gzreview`](./skills/gzreview) | Draft | Produce a teammate-facing code tour of an existing feature branch — story-first markdown opening with **business value**, surfacing the **1–3 load-bearing abstractions** the branch introduces, and showing how they're **injected** into the existing system. Diagrams are inline Mermaid fences with theme-safe mid-tone colors (no external SVGs to break path resolution). Iterates via `plannotator annotate`. |
 
 ## Installation
 
