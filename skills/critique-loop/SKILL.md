@@ -47,6 +47,7 @@ codex exec \
   --sandbox read-only \
   -o <OUTPUT_FILE> \
   "<PROMPT>" \
+  < /dev/null \
   2>&1 | tee .critique-loop/<SLUG>.nav.log
 
 grep -oE 'session id: [0-9a-f-]{36}' .critique-loop/<SLUG>.nav.log \
@@ -60,10 +61,15 @@ SID=$(cat .critique-loop/<SLUG>.session-id)
 codex exec resume "$SID" \
   -m gpt-5.5 \
   -c model_reasoning_effort=xhigh \
-  --sandbox read-only \
+  -c sandbox_mode='"read-only"' \
   -o <OUTPUT_FILE> \
-  "<PROMPT>"
+  "<PROMPT>" \
+  < /dev/null
 ```
+
+> **Why `< /dev/null`?** `codex exec` reads from stdin in addition to the positional prompt argument. When the parent agent leaves stdin open (typical for non-interactive harnesses), codex blocks indefinitely on `Reading additional input from stdin...` and never starts the model call — symptom: a codex process alive for many minutes with no log output. Closing stdin is mandatory for non-interactive use.
+
+> **Why `-c sandbox_mode` on resume but `--sandbox` on the first call?** `codex exec` accepts the `--sandbox` flag; `codex exec resume` does NOT — it only takes `-c` config overrides, so the equivalent is `-c sandbox_mode='"read-only"'` (the value is parsed as TOML, hence the inner quotes). Passing `--sandbox` to `resume` errors out with a help dump and no review is generated.
 
 #### If Navigator CLI = `cursor`
 
@@ -106,7 +112,7 @@ After either START-SESSION, verify `.critique-loop/<SLUG>.session-id` is non-emp
 ## Prerequisites
 
 - Navigator CLI is installed and authenticated:
-  - **Codex:** `codex --version` succeeds, `codex login` done. Smoke test: `codex exec -m gpt-5.5 --sandbox read-only "reply OK"` prints `OK`.
+  - **Codex:** `codex --version` succeeds, `codex login` done. Smoke test: `codex exec -m gpt-5.5 --sandbox read-only "reply OK" < /dev/null` prints `OK`. (The `< /dev/null` is required; see the codex adapter note above.)
   - **Cursor:** `cursor-agent --version` succeeds, `cursor-agent login` done. Smoke test: `cursor-agent -p --trust --model gpt-5.3-codex-xhigh --mode plan "reply with exactly: OK"` prints `OK`.
 - Current directory is a git repo.
 - Current branch is not `main`/`master`. If on `main`, ask the user for a branch name and slug before proceeding.
