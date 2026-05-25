@@ -1,13 +1,14 @@
-# Surveying architecture & writing the design — `gzship` Phase 3 reference
+# Surveying architecture & writing the design — `gzship` Phase 4 reference
 
 ## Purpose
 
-Phase 3 produces `docs/features/<slug>/design.md` plus an architecture diagram
-showing both the **current** and **proposed** architecture. The design doc is the
-input to the **Phase 4 gate**: a cross-model navigator — run through the
-`critique-loop` skill (e.g. Codex) — reviews it adversarially, and the developer
-must also approve it, before implementation begins. It must let a reviewer
-understand *why* this design, not just *what* it is.
+Phase 4 produces `docs/features/<slug>/design.md` plus an architecture diagram
+showing both the **current** and **proposed** architecture, and (when warranted)
+new entries under `docs/adr/`. The design doc is the input to the **Phase 5
+gate**: a cross-model navigator — run through the `critique-loop` skill (e.g.
+Codex) — reviews it adversarially, and the developer must also approve it,
+before implementation begins. It must let a reviewer understand *why* this
+design, not just *what* it is.
 
 This file has two parts: **Rules** every design must obey, and **Recommendations**
 applied with judgment. Follow the rules always.
@@ -45,8 +46,9 @@ A design doc that breaks one of these fails the gate.
   drive a tradeoff; link full schemas.
 - **For legacy or untested code, name the seams and a characterization-test plan** —
   how you will pin current behavior before changing it.
-- **Record architecture-significant decisions as ADRs** — Context / Decision /
-  Consequences; one per decision; immutable once accepted.
+- **Record architecture-significant decisions as ADRs** — sparingly, only when
+  the decision meets all three offer criteria (see *Architecture Decision
+  Records*). One per decision; immutable once accepted.
 - **Address cross-cutting concerns** — security, observability, data migration —
   or mark each an explicit "N/A because…".
 
@@ -57,6 +59,13 @@ box, pin down: **module boundaries** (what owns what, where the seams are),
 **data flow** (how a request moves, what it carries), **resident patterns** (the
 conventions the code already follows), and **prior art** (the closest existing
 feature — copy its shape).
+
+**Read existing ADRs in the area before designing.** Run `ls docs/adr/ 2>/dev/null`
+and skim any entries whose slug touches this feature's area. ADRs record
+deliberate decisions — re-litigating them silently is how a design loses a
+reviewer's trust. If a candidate design contradicts an existing ADR, surface
+that in the design doc with a callout (`*contradicts ADR-NNNN — but worth
+reopening because…*`) — never just route around it.
 
 When the area is **untested or unfamiliar**, use *Working Effectively with Legacy
 Code* (Michael Feathers):
@@ -178,8 +187,85 @@ diagram source and embed it as a fenced code block so it is reviewable as text.
 - **Assumptions & open questions** — explicit (Rules 6, 7).
 - **Implementation stage breakdown** — the feature split into ordered,
   independently testable stages, each small enough for one double-loop TDD cycle.
-  Drives Phase 5; if it has **5 or more stages**, each is dispatched to its own
+  Drives Phase 6; if it has **5 or more stages**, each is dispatched to its own
   subagent.
+
+## Architecture Decision Records (ADRs)
+
+ADRs record *that* a decision was made and *why*, in one place a future reader
+will look. They are written sparingly, alongside `design.md`, at Phase 4.
+
+### When to write one
+
+All three of these must be true:
+
+1. **Hard to reverse** — the cost of changing your mind later is meaningful
+   (database choice, API contract, integration pattern across modules, lock-in).
+2. **Surprising without context** — a future reader will look at the code and
+   wonder "why on earth did they do it this way?" If the rationale is obvious
+   from the code, you do not need an ADR.
+3. **The result of a real trade-off** — there were genuine alternatives and you
+   picked one for specific reasons. "We did the obvious thing" is not an ADR.
+
+If any of the three is missing, skip the ADR. Most design decisions do not
+warrant one.
+
+### What qualifies
+
+- **Architectural shape.** "We're using a monorepo." "The write model is event-
+  sourced, the read model is projected into Postgres."
+- **Integration patterns between modules.** "Ordering and Billing communicate
+  via domain events, not synchronous HTTP."
+- **Technology choices that carry lock-in.** Database, message bus, auth
+  provider, deployment target. Not every library — only ones that would take a
+  quarter to swap out.
+- **Boundary and scope decisions.** "Customer data is owned by the Customer
+  module; other modules reference it by ID only." The explicit no-s are as
+  valuable as the yes-s.
+- **Deliberate deviations from the obvious path.** "We're using manual SQL
+  instead of an ORM because X." Anything where a reasonable reader would assume
+  the opposite.
+- **Constraints not visible in the code.** "We can't use AWS because of
+  compliance requirements." "Response times must be under 200 ms because of the
+  partner API contract."
+- **Rejected alternatives when the rejection is non-obvious.** If you considered
+  GraphQL and picked REST for subtle reasons, record it — otherwise someone
+  will suggest GraphQL again in six months.
+
+### Format
+
+ADRs live in `docs/adr/` and use sequential numbering: `0001-<slug>.md`,
+`0002-<slug>.md`, etc.
+
+Lazily create the `docs/adr/` directory — only when the first ADR is needed.
+Scan existing entries for the highest number and increment by one.
+
+Template:
+
+```md
+# <Short title of the decision>
+
+<1–3 sentences: what's the context, what did we decide, and why.>
+```
+
+That's it. An ADR can be a single paragraph. The value is in recording *that*
+a decision was made and *why* — not in filling out sections.
+
+**Optional sections** — include only when they add genuine value; most ADRs
+will not need them:
+
+- **Status** frontmatter (`proposed | accepted | deprecated | superseded by
+  ADR-NNNN`) — useful when decisions are revisited.
+- **Considered Options** — only when the rejected alternatives are worth
+  remembering.
+- **Consequences** — only when non-obvious downstream effects need to be
+  called out.
+
+### Commit alongside the design
+
+ADRs created during Phase 4 are committed together with `design.md` in the
+same `docs:` conventional commit (e.g. `docs: design for <slug>`). They are
+reviewed at the **Phase 5 gate** alongside the design.
 
 ## Anti-patterns
 
@@ -203,7 +289,9 @@ diagram source and embed it as a fenced code block so it is reviewable as text.
 - "Design Docs at Google" — Malte Ubl: context/scope, goals/non-goals, alternatives,
   tradeoff-centric design, cross-cutting concerns.
 - Architecture Decision Records — Michael Nygard; Martin Fowler: Context / Decision
-  / Consequences, immutable once accepted.
+  / Consequences, immutable once accepted. Tight 1–3-sentence template and the
+  hard-to-reverse / surprising / real-trade-off offer criteria are adapted from
+  mattpocock/skills' `grill-with-docs` ADR-FORMAT.
 - The C4 model — Simon Brown: context diagrams, self-describing notation.
 - D2 ([d2lang.com](https://d2lang.com)) and Mermaid ([mermaid.js.org](https://mermaid.js.org)):
   diagram languages.

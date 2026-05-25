@@ -1,14 +1,21 @@
 # gzship — Design Spec
 
 **Date:** 2026-05-25
-**Status:** Draft, awaiting user approval
+**Status:** Brainstorming snapshot — see *Implementation note* below
 **Author:** Brainstormed with Claude (Opus 4.7) on `gzship-skill` branch
+
+> **Implementation note (2026-05-25).** This spec captured the brainstorming output before the skill was assembled. The landed implementation differs in two ways from the original plan written below:
+>
+> 1. **Domain Terms live in the PRD, not in a separate `CONTEXT.md`.** A central `CONTEXT.md` would accumulate indefinitely and rot into a stale dictionary. Each PRD now carries its own `## Domain Terms` section, with cross-feature consistency preserved by Phase 1's prior-PRD grep and a `## Aliased Terms` section that flags deliberate redefinitions. References to `CONTEXT.md` below should be read as references to the PRD's Domain Terms section.
+> 2. **Six phases, not seven.** The original plan split *Slice* and *Implement* into two phases. The shipped skill folds the stage breakdown into the design doc itself (still authored in Phase 4, reviewed at Phase 5) and Phase 6 implements stage by stage. Mapping: old Phase 1 Discover = new Phase 1; old Phase 2 PRD = new Phase 2; old Phase 3 Review A = new Phase 3; old Phase 4 Design = new Phase 4 (with ADRs); old Phase 5 Review B = new Phase 5; old Phase 6 Slice merged into Phase 4 / driven in Phase 6; old Phase 7 Implement = new Phase 6.
+>
+> **Authoritative current state:** `skills/gzship/SKILL.md` and `skills/gzship/DESIGN.md`. The brainstorming text below is preserved for context on the choices that landed.
 
 ## Summary
 
-`gzship` is a Claude-Code-first skill that walks a single feature from a fresh idea to merged code through seven gated phases: discover, PRD, review-A, design, review-B, slice, implement. Each phase produces a committed artifact in `docs/features/<slug>/` (or `docs/adr/` for ADRs). Adversarial reviews are delegated to the existing `critique-loop` skill. Architecture is illustrated with D2 diagrams (current vs. proposed). Implementation runs as vertical-slice tracer bullets with strict per-slice RED→GREEN TDD; subagents fan out for parallel codebase surveys and (when a feature has 5+ slices) for per-slice implementation.
+`gzship` is a Claude-Code-first skill that walks a single feature from a fresh idea to merged code through gated phases: discover, PRD, product review, design, design review, staged implementation. Each phase produces a committed artifact in `docs/features/<slug>/` (or `docs/adr/` for ADRs). Adversarial reviews are delegated to the existing `critique-loop` skill. Architecture is illustrated with D2 diagrams (current vs. proposed). Implementation runs stage by stage with strict per-stage RED→GREEN TDD; subagents fan out for parallel codebase surveys and (when a feature has 5+ stages) for per-stage implementation.
 
-The skill adopts conventions popularised by `mattpocock/skills` (`CONTEXT.md` glossary, `docs/adr/`, the PRD template, vertical-slice tracer bullets, deep-module vocabulary) but **does not depend on `mattpocock/skills` being installed** — the relevant rules are inlined and missing repo files (`CONTEXT.md`, `docs/adr/`) are seeded lazily on first use. The one hard external dependency is `critique-loop` (same repo), which powers every review gate.
+The skill adopts conventions popularised by `mattpocock/skills` (the PRD template, `docs/adr/`, vertical-slice tracer bullets, deep-module vocabulary) but **does not depend on `mattpocock/skills` being installed** — the relevant rules are inlined. Domain terms are kept in each PRD's `## Domain Terms` section (not a central `CONTEXT.md`); `docs/adr/` is seeded lazily on first use. The one hard external dependency is `critique-loop` (same repo), which powers every review gate.
 
 ## Goals
 
@@ -17,7 +24,7 @@ The skill adopts conventions popularised by `mattpocock/skills` (`CONTEXT.md` gl
 - Reviews are adversarial and cross-model (via `critique-loop`), then the developer approves.
 - Implementation discipline: vertical slices only; per-slice RED→GREEN; no horizontal "all tests then all code".
 - Architecture is visible: current and proposed states rendered as D2 diagrams committed alongside the design.
-- Vocabulary is consistent: every doc uses the consumer repo's `CONTEXT.md` glossary; deep-module vocabulary (`module / interface / seam / adapter / depth / leverage / locality`) is used when discussing architecture.
+- Vocabulary is consistent: every doc uses the canonical domain terms defined in each feature's PRD `## Domain Terms` section (and reused via Phase 1's prior-PRD grep); deep-module vocabulary (`module / interface / seam / adapter / depth / leverage / locality`) is used when discussing architecture.
 
 ## Non-goals
 
@@ -27,17 +34,16 @@ The skill adopts conventions popularised by `mattpocock/skills` (`CONTEXT.md` gl
 - Not a code-review-of-existing-PRs tool. Use `critique-loop`'s review-only flow for that.
 - Not an issue-tracker integration. PRD lives only as a file under `docs/features/<slug>/prd.md`. No GitHub issue is created.
 
-## Phase overview
+## Phase overview (as landed — 6 phases)
 
 | # | Phase | Output | Gate |
 |---|---|---|---|
-| 1 | **Discover** | `docs/features/<slug>/scenarios.md` + (lazy) `CONTEXT.md` updates | — |
-| 2 | **PRD** | `docs/features/<slug>/prd.md` | — |
-| 3 | **Review A** | `critique-loop` review notes (gitignored) | `VERDICT: APPROVE` + user "go" |
-| 4 | **Design** | `docs/features/<slug>/design.md` + `diagrams/current.{d2,svg}` + `diagrams/proposed.{d2,svg}` + new `docs/adr/NNNN-*.md` (if any) | — |
-| 5 | **Review B** | `critique-loop` review notes (gitignored) | `VERDICT: APPROVE` + user "go" |
-| 6 | **Slice** | `docs/features/<slug>/slices.md` | user "go" |
-| 7 | **Implement** | code + tests per slice; per-slice `critique-loop` review | all slices green, all reviews `APPROVE` |
+| 1 | **Discover & Scenarios** | `docs/features/<slug>/scenarios.md` (vocabulary sourced from prior PRDs' `## Domain Terms`) | — |
+| 2 | **PRD Synthesis** | `docs/features/<slug>/prd.md` — includes `## Domain Terms` and (when redefining) `## Aliased Terms` | — |
+| 3 | **Product Review** (scenarios + PRD) | `critique-loop` review notes (gitignored) + `plannotator annotate` developer review | navigator `VERDICT: APPROVE` + explicit developer approval |
+| 4 | **Architecture & Design** | `docs/features/<slug>/design.md` + `diagrams/architecture.{d2,svg}` + new `docs/adr/NNNN-*.md` (if any) — design.md contains the stage breakdown | — |
+| 5 | **Design Review** | `critique-loop` review notes (gitignored) + `plannotator annotate` developer review | navigator `VERDICT: APPROVE` + explicit developer approval |
+| 6 | **Staged Implementation** | code + tests per stage; per-stage `critique-loop` review; one final whole-diff review | all stages green, all reviews `APPROVE` |
 
 The slug is the current git branch name; if on `main`/`master`, the skill asks for one.
 
@@ -47,37 +53,33 @@ The first time `gzship` runs against a repo, it creates whatever is missing:
 
 ```
 <repo-root>/
-├── CONTEXT.md                        # lazily seeded on first resolved term
 ├── docs/
 │   ├── adr/                          # lazily created when the first ADR is needed
 │   │   └── NNNN-<slug>.md
 │   └── features/<slug>/              # one directory per feature
 │       ├── scenarios.md              # Phase 1
-│       ├── prd.md                    # Phase 2
-│       ├── design.md                 # Phase 4
-│       ├── diagrams/
-│       │   ├── current.d2            # Phase 4 source
-│       │   ├── current.svg           # Phase 4 rendered (or .placeholder.md if d2 missing)
-│       │   ├── proposed.d2
-│       │   └── proposed.svg
-│       └── slices.md                 # Phase 6
+│       ├── prd.md                    # Phase 2 — includes ## Domain Terms (and ## Aliased Terms when redefining)
+│       ├── design.md                 # Phase 4 — includes the implementation stage breakdown
+│       └── diagrams/
+│           ├── architecture.d2       # Phase 4 source (current + proposed in one file)
+│           ├── architecture-current.svg
+│           └── architecture-proposed.svg
 └── .critique-loop/                   # gitignored; critique-loop's working state
     └── <slug>-*.md                   # plan-review, code-review, session ids, etc.
 ```
 
-`docs/features/<slug>/` is the unit of work. `docs/adr/` and `CONTEXT.md` are shared across features.
+`docs/features/<slug>/` is the unit of work. `docs/adr/` is shared across features. There is **no central `CONTEXT.md`** — domain terms live in each PRD.
 
 ## Skill file structure (this repo)
 
 ```
 skills/gzship/
-├── SKILL.md                  # orchestrator: 7 phases, gates, subagent dispatch, escalation rules
+├── SKILL.md                  # orchestrator: 6 phases, gates, subagent dispatch, escalation rules
 └── references/
-    ├── scenarios.md          # CONTEXT.md format + BDD scenarios (Gherkin, declarative, Three Amigos, Example Mapping, double-loop framing)
-    ├── prd.md                # PRD template (Problem · Solution · User Stories · Implementation Decisions · Testing Decisions · Out of Scope) + how scenarios back stories
-    ├── architecture.md       # Deep-modules vocab (module/interface/seam/adapter/depth/leverage/locality) + survey technique + deletion test + ADR offer criteria
-    ├── implementation.md     # Vertical-slice tracer bullets (AFK vs HITL) + per-slice RED→GREEN + horizontal-slicing anti-pattern + subagent escalation (5+ slices)
-    └── d2.md                 # D2 syntax for architecture diagrams (containers, sql_tables, scenarios for before/after) + install/fallback + rendering pipeline
+    ├── scenarios.md          # BDD scenarios (Gherkin, declarative, Three Amigos, Example Mapping) + prior-PRD Domain Terms grep
+    ├── prd.md                # PRD template (Problem · Solution · Domain Terms · Aliased Terms · User Stories · Implementation Decisions · Testing Decisions · Out of Scope)
+    ├── architecture.md       # Deep-modules vocab (module/interface/seam/adapter/depth/leverage/locality) + survey technique + deletion test + ADR offer criteria + D2 diagramming
+    └── implementation.md     # Double-loop TDD + stage decomposition + per-stage cycle + horizontal-slicing anti-pattern + subagent escalation (5+ stages)
 ```
 
 SKILL.md is the orchestrator. Reference files are loaded only when the corresponding phase runs (progressive disclosure). The skill should fit comfortably in context when only SKILL.md is loaded.
@@ -91,12 +93,12 @@ SKILL.md is the orchestrator. Reference files are loaded only when the correspon
 **Steps:**
 
 1. **Survey existing code.** Dispatch an `Explore` subagent to map the area of the codebase the feature will land in. Brief: "find the modules, callers, tests, and seams relevant to <feature>. Return a one-screen map; do not propose changes." Keeps main context lean.
-2. **Read the glossary.** Open `CONTEXT.md` (if it exists). If a term in the user's prompt is missing or fuzzy, **grill the user one question at a time** (mattpocock's `grill-me` style) and **update `CONTEXT.md` inline** as terms resolve. Seed `CONTEXT.md` lazily on the first resolved term using the format in `references/scenarios.md`.
+2. **Gather the vocabulary.** Run `grep -l "^## Domain Terms" docs/features/*/prd.md` and read each prior PRD's Domain Terms section. Reuse canonical names verbatim — do not silently rename. If a term in the user's prompt is missing from prior PRDs, pick an opinionated name now; it will be formalised in the Phase 2 PRD's Domain Terms section. If a term needs to be redefined, note it for the new PRD's `## Aliased Terms` section.
 3. **Discover scenarios via Example Mapping** (Matt Wynne / Cucumber Book). For each user story, surface 1–3 concrete examples; turn each example into a Given/When/Then scenario.
 4. **Write scenarios** to `docs/features/<slug>/scenarios.md` in Gherkin form. Rules (full detail in `references/scenarios.md`):
    - **Declarative**, not imperative — describe *what* the user achieves, not *which buttons* are clicked.
    - **One behaviour per scenario.** Scenarios that combine concerns get split.
-   - **Use `CONTEXT.md` vocabulary** for every noun.
+   - **Use canonical Domain Terms** for every noun (from prior PRDs, or new terms you've chosen consistently and will formalise in Phase 2).
    - **Scenario outlines** for parameterised cases.
    - Mark each scenario with the user story it supports (`# Story: 3`).
 5. **Commit:** `docs: scenarios for <slug>`.
@@ -107,10 +109,12 @@ SKILL.md is the orchestrator. Reference files are loaded only when the correspon
 
 **Goal:** synthesise the conversation into a PRD without re-interviewing.
 
-**Template** (per mattpocock's `to-prd`, full detail in `references/prd.md`):
+**Template** (per mattpocock's `to-prd`, extended with Domain Terms; full detail in `references/prd.md`):
 
 - **Problem Statement** — from the user's perspective.
 - **Solution** — from the user's perspective.
+- **Domain Terms** — every domain concept the feature touches, defined tightly (one or two sentences each), opinionated, with rejected aliases under `_Avoid_:`. This is the canonical vocabulary for everything downstream in this feature.
+- **Aliased Terms** — only when deliberately redefining a prior PRD's term. Calls out the prior PRD path and which term is being deprecated. Silent overload is forbidden.
 - **User Stories** — long numbered list, `As an <actor>, I want <feature>, so that <benefit>`. Each story lists which scenarios in `scenarios.md` verify it (e.g. `(verified by Scenarios 2, 4, 7)`).
 - **Implementation Decisions** — modules to build/modify, interface shapes, schema changes, API contracts. No file paths or code snippets (exception: a decision-encoding snippet from a prototype, trimmed to decision-rich parts).
 - **Testing Decisions** — what makes a good test for this feature; which modules will be tested; prior-art tests in the repo to follow.
@@ -196,7 +200,7 @@ Same shape as Review A. Navigator briefed to probe for:
 
 **Per-slice loop** (strict order, no horizontal slicing):
 
-1. **RED:** write one failing test that asserts one behaviour from this slice's acceptance criteria. Test through the public interface only; integration-style; uses `CONTEXT.md` vocabulary in its name.
+1. **RED:** write one failing test that asserts one behaviour from this slice's acceptance criteria. Test through the public interface only; integration-style; uses canonical Domain Terms (from the feature's PRD) in its name.
 2. **GREEN:** minimal code to pass that one test.
 3. **Repeat** RED→GREEN until every acceptance criterion has at least one test.
 4. **Refactor on green only.** Apply deepening if the new code reveals a shallow module in the path. Run the suite after each refactor step.
@@ -207,7 +211,7 @@ Same shape as Review A. Navigator briefed to probe for:
 
 **Horizontal slicing is explicitly forbidden.** Writing all tests first and then all the code produces tests that verify imagined behaviour and break under real refactors. The skill calls this out and references mattpocock's `tdd/SKILL.md` rationale.
 
-**Subagent escalation (Approach 2):** when the feature has **5+ slices**, dispatch each slice to a fresh subagent. Brief contains: slice ID, acceptance criteria, references to `prd.md` and `design.md`, the `CONTEXT.md` path, and the deep-modules vocabulary file. Subagent does steps 1–6 and returns a summary; main session runs step 7 (`critique-loop`) and step 8 (task update). Sequential, not parallel — slices typically depend on each other and parallel subagents collide.
+**Subagent escalation (Approach 2):** when the feature has **5+ slices**, dispatch each slice to a fresh subagent. Brief contains: slice ID, acceptance criteria, references to `prd.md` (and its `## Domain Terms` section as the canonical vocabulary) and `design.md`, plus the deep-modules vocabulary file. Subagent does steps 1–6 and returns a summary; main session runs step 7 (`critique-loop`) and step 8 (task update). Sequential, not parallel — slices typically depend on each other and parallel subagents collide.
 
 For fewer than 5 slices, the main session does everything.
 
@@ -234,12 +238,12 @@ Every review gate (Phases 3, 5, and once per slice in Phase 7) invokes `critique
 
 Each review uses the same `<slug>` so all rounds share one navigator session (per `critique-loop`'s session-id reuse). The navigator therefore remembers the PRD and design context when it reviews each slice's diff — without re-reading.
 
-### `CONTEXT.md` and `docs/adr/` (mattpocock conventions)
+### Domain Terms and `docs/adr/` (mattpocock conventions, adapted)
 
-- `CONTEXT.md`: read in Phase 1 (Discover) and Phase 4 (Design). Updated inline as terms resolve. Lazily seeded on first resolved term (do not scaffold upfront). Format and rules in `references/scenarios.md`.
-- `docs/adr/`: offered in Phase 4 (Design) when a decision meets all three criteria. Lazily created when the first ADR is needed. Sequential numbering. Format in `references/architecture.md`.
+- **Domain Terms in the PRD, not a central `CONTEXT.md`.** Each PRD's `## Domain Terms` section is the canonical vocabulary for its feature. Phase 1 greps prior PRDs for existing terms (`grep -l "^## Domain Terms" docs/features/*/prd.md`) before naming new ones. Deliberate redefinitions go in the PRD's `## Aliased Terms` section with the prior PRD's path. Format and rules in `references/prd.md`. Rationale for diverging from mattpocock's central-glossary convention: a central file accumulates indefinitely and rots; per-PRD scoping keeps terms tied to the feature that introduced them.
+- **`docs/adr/`** — offered in Phase 4 (Design) when a decision meets all three criteria (hard-to-reverse, surprising-without-context, result of a real trade-off). Lazily created when the first ADR is needed. Sequential numbering. Format in `references/architecture.md` § *Architecture Decision Records*.
 
-`gzship` does not depend on `mattpocock/skills` being installed. The relevant rules are inlined / referenced. Where the user has mattpocock's `/setup-matt-pocock-skills` already run, `gzship` happily uses what's there.
+`gzship` does not depend on `mattpocock/skills` being installed. The relevant rules are inlined / referenced. Where the user has mattpocock's `/setup-matt-pocock-skills` already run, `gzship` does not conflict with it (mattpocock's `CONTEXT.md` may continue to exist; `gzship` simply does not read or write it).
 
 ### D2 (diagrams)
 
@@ -253,7 +257,7 @@ Each review uses the same `<slug>` so all rounds share one navigator session (pe
 
 These are stated in SKILL.md as load-bearing rules:
 
-- **Ubiquitous language first.** Every doc gzship writes uses `CONTEXT.md` vocabulary. Drift = call out + propose canonical term.
+- **Ubiquitous language first.** Every doc gzship writes uses the canonical Domain Terms defined in the feature's PRD (and reused from prior PRDs via Phase 1's grep). Drift = call out + propose canonical term; deliberate redefinition = `## Aliased Terms` entry.
 - **ADRs are sparingly offered** — never as a checkbox; only when hard-to-reverse + surprising + real trade-off.
 - **Vertical slices only.** Horizontal slicing (all tests, then all code) is explicitly forbidden.
 - **Deletion test.** When surveying existing architecture, ask "if I deleted this, would complexity vanish or concentrate?"
@@ -277,7 +281,7 @@ These are stated in SKILL.md as load-bearing rules:
 1. **D2 binary install:** is the install-prompt friction acceptable, or should the skill ship a hermetic D2 binary path? — defer.
 2. **Subagent escalation threshold:** 5+ slices is a guess. Tune after first real runs.
 3. **`critique-loop` session sharing across all 3 gates:** confirmed possible by `critique-loop`'s session-id reuse, but the prompt templates per gate need to be designed so the navigator doesn't get confused by the topic switch (scenarios → design → slice code).
-4. **CONTEXT.md drift across features:** if two features add conflicting terms, the skill calls it out — but the resolution is the user's. No auto-merge.
+4. **Domain Terms drift across features:** if two features' PRDs add conflicting terms, Phase 1's prior-PRD grep surfaces the conflict and the new PRD must either reuse the prior canonical term or declare an `## Aliased Terms` entry. No auto-merge. (This replaces the original `CONTEXT.md drift` question — the failure mode is the same; the resolution is now per-PRD.)
 
 ## Next step
 

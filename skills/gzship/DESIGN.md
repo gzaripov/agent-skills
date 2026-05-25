@@ -1,10 +1,10 @@
 # Design — `gzship` skill
 
-> **Status (2026-05-19):** Name chosen (`gzship`). Home: `gzaripov/agent-skills` monorepo at `skills/gzship/`. Design approved; implementation plan pending.
+> **Status (2026-05-25):** Name chosen (`gzship`). Home: `gzaripov/agent-skills` monorepo at `skills/gzship/`. Extended on 2026-05-25 to add a **PRD Synthesis** phase, **Domain Terms** in the PRD (per-PRD, no separate `CONTEXT.md`), and **lazy ADR** seeding under `docs/adr/` — borrowing structure from mattpocock/skills while staying self-contained.
 
 ## Core principle
 
-A **Claude-Code-first** skill that carries a single feature from a **BDD scenario → architecture/design → staged TDD implementation**. Every phase produces exactly one artifact, and **no phase advances until both the navigator (cross-model review) and the developer have approved that artifact.** The flow is outside-in: behavior first, architecture second, code last.
+A **Claude-Code-first** skill that carries a single feature from a **BDD scenario → PRD → architecture/design → staged TDD implementation**. Every phase produces exactly one artifact, and **no phase advances until both the navigator (cross-model review) and the developer have approved that artifact.** The flow is outside-in: behavior first, product framing second, architecture third, code last.
 
 ## Scope and non-goals
 
@@ -17,40 +17,55 @@ A **Claude-Code-first** skill that carries a single feature from a **BDD scenari
 
 ```
 skills/gzship/
-  SKILL.md                  # orchestrator: 5 phases, gates, subagent dispatch
+  SKILL.md                  # orchestrator: 6 phases, gates, subagent dispatch
   references/
-    scenarios.md            # BDD scenario writing — book-derived practices
-    architecture.md         # surveying existing code/architecture + D2 diagramming
+    scenarios.md            # BDD scenario writing — book-derived practices + prior-PRD term grep
+    prd.md                  # PRD template (Problem · Solution · Domain Terms · User Stories · Decisions · Testing · Scope) + Aliased Terms
+    architecture.md         # surveying existing code/architecture + D2 diagramming + ADR offer criteria
     implementation.md       # double-loop TDD, stage decomposition, per-stage cycle
 ```
 
 `SKILL.md` is the orchestrator and stays lean. Each reference file holds the heavy how-to for one phase and is read only when that phase runs.
 
-## The 5 phases
+## The 6 phases
 
 ### Phase 0 — Frame & track
 Derive a kebab-case `<slug>` from the feature request. Create `docs/features/<slug>/`. Confirm the working directory is a git repo and the current branch is a feature branch (not `main`/`master`). Create a Task/Todo list with one entry per phase and per gate — this list is the "goal tracker" the developer can watch.
 
-### Phase 1 — Discovery & Scenario (BDD)
+### Phase 1 — Discovery & Scenarios (BDD)
 1. Dispatch parallel `Explore` subagents to survey the existing codebase: where the feature lands, what already exists, which modules/patterns it touches, what it would conflict with.
-2. Synthesize the findings.
-3. Write `docs/features/<slug>/scenarios.md` — Gherkin-style `Given/When/Then`, following `references/scenarios.md`: declarative not imperative, ubiquitous language, one observable behavior per scenario, scenario outlines for example tables. Include a **"How it lands in the product"** section derived from the survey.
+2. **Grep prior PRDs for canonical domain terms** (`docs/features/*/prd.md` `## Domain Terms` sections) and reuse them so vocabulary doesn't drift across features.
+3. Synthesize the findings.
+4. Write `docs/features/<slug>/scenarios.md` — Gherkin-style `Given/When/Then`, following `references/scenarios.md`: declarative not imperative, ubiquitous language, one observable behavior per scenario, scenario outlines for example tables. Include a **"How it lands in the product"** section derived from the survey.
 
-### Phase 2 — Scenario Review Gate
-1. Run `critique-loop`'s **review-only flow** against `scenarios.md` — the navigator reviews adversarially.
+### Phase 2 — PRD Synthesis
+Synthesize the conversation, the Phase 1 survey, and `scenarios.md` into `docs/features/<slug>/prd.md` using the template in `references/prd.md`:
+
+- **Problem Statement / Solution** from the user's perspective.
+- **`## Domain Terms`** — every domain concept the feature touches, defined tightly (one or two sentences each), opinionated, with rejected aliases under `_Avoid_:`. This is the canonical vocabulary for everything downstream in this feature.
+- **`## Aliased Terms`** — only when deliberately redefining a prior PRD's term. Silent overload is forbidden.
+- **User Stories** tagged with the scenarios in `scenarios.md` that verify them.
+- **Implementation Decisions / Testing Decisions / Out of Scope** — no file paths or code snippets.
+
+Do not re-interview the developer here; surface gaps as **Open Questions** for the gate.
+
+### Phase 3 — Product Review Gate
+Reviews `scenarios.md` and `prd.md` together — one product framing, gated as one:
+1. Run `critique-loop`'s **review-only flow** against both files — the navigator reviews adversarially.
 2. Resolve code/scope-level asks directly; surface product-level asks to the developer.
-3. **Developer review via Plannotator.** Open `scenarios.md` in Plannotator (`plannotator annotate`) so the developer annotates it directly in the browser; address every returned annotation. The phase advances only on explicit developer approval.
-   Both the navigator verdict and the developer approval are required before Phase 3.
+3. **Developer review via Plannotator.** Open each file in Plannotator (`plannotator annotate`) and address every returned annotation. The phase advances only on explicit developer approval of both files.
+   Both the navigator verdict and the developer approval are required before Phase 4.
 
-### Phase 3 — Architecture & Design
-1. Dispatch parallel subagents to survey the **existing architecture**: current module boundaries, data flow, design patterns already in use, prior art for similar features.
-2. Produce two D2 diagrams — **current** and **proposed** — using D2's `scenarios` keyword so a single `architecture.d2` file expresses both states.
-3. Write `docs/features/<slug>/design.md`: components & interfaces, data flow, error handling, tradeoffs considered, and the **implementation stage breakdown**. Embed the rendered diagrams.
+### Phase 4 — Architecture & Design
+1. Dispatch parallel subagents to survey the **existing architecture**: current module boundaries, data flow, design patterns already in use, prior art for similar features. Skim existing entries in `docs/adr/` that touch this area.
+2. Produce two architecture diagrams — **current** and **proposed** — drafted in both D2 and Mermaid, rendered, the clearer of the two embedded in the design.
+3. Write `docs/features/<slug>/design.md`: components & interfaces, data flow, error handling, tradeoffs considered, and the **implementation stage breakdown**.
+4. **Write ADRs sparingly.** For any decision that is **hard-to-reverse**, **surprising-without-context**, and **the result of a real trade-off** (all three must hold), write a new entry under `docs/adr/NNNN-<slug>.md` — sequential numbering, lazily create `docs/adr/` if missing. ADRs are committed alongside `design.md` in the same `docs:` commit.
 
-### Phase 4 — Design Review Gate
-Same shape as Phase 2: `critique-loop` review-only on `design.md`, resolve asks, surface architecture/product tradeoffs to the developer, then **developer review via Plannotator** (`plannotator annotate design.md`) — address every returned annotation, advance only on explicit approval. Both approvals required before Phase 5.
+### Phase 5 — Design Review Gate
+Same shape as Phase 3: `critique-loop` review-only on `design.md` (and any new ADRs), resolve asks, surface architecture/product tradeoffs to the developer, then **developer review via Plannotator** (`plannotator annotate design.md`) — address every returned annotation, advance only on explicit approval. Both approvals required before Phase 6.
 
-### Phase 5 — Staged Implementation
+### Phase 6 — Staged Implementation
 For each stage in the design's stage breakdown, run the **double-loop TDD** cycle:
 1. **Write tests** — an acceptance/behavior test for the stage's scenario (outer loop, RED), then unit tests (inner loop, RED).
 2. **Write code** — minimal code to green, then refactor.
@@ -67,14 +82,27 @@ For each stage in the design's stage breakdown, run the **double-loop TDD** cycl
 
 ```
 docs/features/<slug>/
-  scenarios.md
-  design.md
+  scenarios.md                      # Phase 1
+  prd.md                            # Phase 2 — includes ## Domain Terms (and ## Aliased Terms when redefining)
+  design.md                         # Phase 4
   diagrams/architecture.d2          # current = base, proposed = D2 scenario
   diagrams/architecture-current.svg
   diagrams/architecture-proposed.svg
+
+docs/adr/                           # Phase 4 — lazily created when the first ADR is needed
+  NNNN-<slug>.md                    # sequentially numbered
 ```
 
-All committed with `docs:` conventional commits. `critique-loop`'s `.critique-loop/` review scratch stays gitignored and is not part of the feature.
+All committed with `docs:` conventional commits. ADRs created in Phase 4 are committed together with `design.md` in the same commit. `critique-loop`'s `.critique-loop/` review scratch stays gitignored and is not part of the feature.
+
+## Domain vocabulary — per-PRD, not a central `CONTEXT.md`
+
+`gzship` borrows mattpocock/skills' ubiquitous-language discipline but **does not** introduce a separate `CONTEXT.md` at the repo root. Domain terms live in each PRD's `## Domain Terms` section instead. The trade-off:
+
+- **Why per-PRD.** A central `CONTEXT.md` accumulates indefinitely and rots into a stale dictionary nobody reads. Per-PRD scoping keeps terms tied to the feature that introduced them and dies with the feature if it's retired.
+- **Cross-feature consistency** is preserved by Phase 1's prior-PRD grep (`grep -l "^## Domain Terms" docs/features/*/prd.md`): before defining a new term, the skill reads what previous PRDs have already named.
+- **Deliberate redefinition** is handled by the PRD's `## Aliased Terms` section, which calls out the prior PRD path and which term is being deprecated.
+- **Silent term drift** is explicitly forbidden (Rule 5 in `references/prd.md`).
 
 ## D2 handling
 
@@ -82,8 +110,9 @@ All committed with `docs:` conventional commits. `critique-loop`'s `.critique-lo
 
 ## Reference file content (book-derived)
 
-- **`scenarios.md`** — from *BDD in Action* (John Ferguson Smart), *Specification by Example* (Gojko Adzic), *Discovery* (Seb Rose & Gáspár Nagy), *The Cucumber Book* (Wynne & Hellesøy): Three Amigos / Example Mapping, declarative scenarios, ubiquitous language, anti-patterns (imperative or UI-coupled scenarios), scenario outlines.
-- **`architecture.md`** — from *Working Effectively with Legacy Code* (Michael Feathers): seams, characterization tests, reading existing architecture before proposing changes; plus D2 syntax for architecture diagrams (containers, connections, `scenarios` for before/after) and install/fallback handling.
+- **`scenarios.md`** — from *BDD in Action* (John Ferguson Smart), *Specification by Example* (Gojko Adzic), *Discovery* (Seb Rose & Gáspár Nagy), *The Cucumber Book* (Wynne & Hellesøy): Three Amigos / Example Mapping, declarative scenarios, ubiquitous language, anti-patterns (imperative or UI-coupled scenarios), scenario outlines. Plus the prior-PRD term-grep discipline (no central `CONTEXT.md`).
+- **`prd.md`** — from mattpocock/skills' `to-prd` (PRD template: Problem · Solution · User Stories · Implementation Decisions · Testing Decisions · Out of Scope) and `grill-with-docs` (Domain Terms format adapted from `CONTEXT.md`); plus *Domain-Driven Design* (Eric Evans) for the ubiquitous-language motivation and *Inspired* (Marty Cagan) for "PRD as synthesis, not interview."
+- **`architecture.md`** — from *Working Effectively with Legacy Code* (Michael Feathers): seams, characterization tests, reading existing architecture before proposing changes; plus D2 syntax for architecture diagrams (containers, connections, `scenarios` for before/after) and install/fallback handling; plus mattpocock/skills' ADR offer criteria (hard-to-reverse + surprising + real trade-off) and tight 1–3-sentence ADR template.
 - **`implementation.md`** — from *Test-Driven Development by Example* (Kent Beck): red-green-refactor; *Growing Object-Oriented Software, Guided by Tests* (Freeman & Pryce): double-loop / outside-in TDD; plus stage decomposition heuristics and the subagent-per-stage escalation rule.
 
 ## Building `gzship` itself

@@ -1,8 +1,8 @@
-# Staged TDD implementation — `gzship` Phase 5 reference
+# Staged TDD implementation — `gzship` Phase 6 reference
 
 ## Purpose
 
-Phase 5 turns the approved `design.md` into shipped code, one stage at a time, with
+Phase 6 turns the approved `design.md` into shipped code, one stage at a time, with
 tests written first. Read this file before the first stage, then run the per-stage
 cycle for every stage in the design's implementation stage breakdown. Every stage's
 diff — and the whole feature at the end — is reviewed by a cross-model navigator,

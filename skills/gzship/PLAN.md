@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the `gzship` skill — a Claude-Code-first orchestrator that carries one feature from a BDD scenario through architecture/design to staged TDD implementation, gating every phase on both a cross-model review and a developer approval.
+> **Note (2026-05-25 update).** This plan was authored for the original 5-phase `gzship`. The skill has since been extended to 6 phases — a new **Phase 2 PRD Synthesis** sits between Discovery and the Product Review Gate, and Phase 4 (Architecture) now also produces ADRs under `docs/adr/` for hard-to-reverse decisions. References to `scenarios.md` here still apply; treat any per-phase task on Phase 3+ as having shifted by one (e.g. old "Phase 3 design" = new Phase 4). Authoritative current state: `DESIGN.md` and `SKILL.md`.
 
-**Architecture:** A lean `SKILL.md` orchestrator (5 phases + 2 gates) plus three reference files loaded per-phase. Cross-model reviews are delegated to the existing `critique-loop` skill's review-only flow; the developer-review step at each gate is run through the `plannotator` CLI so the developer annotates the artifact in a browser. Built with the `writing-skills` TDD process — baseline pressure scenarios (RED), write the skill (GREEN), close loopholes (REFACTOR).
+**Goal:** Build the `gzship` skill — a Claude-Code-first orchestrator that carries one feature from a BDD scenario through PRD synthesis, architecture/design, to staged TDD implementation, gating every phase on both a cross-model review and a developer approval.
+
+**Architecture:** A lean `SKILL.md` orchestrator (6 phases + 2 gates) plus four reference files loaded per-phase (`scenarios.md`, `prd.md`, `architecture.md`, `implementation.md`). Cross-model reviews are delegated to the existing `critique-loop` skill's review-only flow; the developer-review step at each gate is run through the `plannotator` CLI so the developer annotates the artifact in a browser. Built with the `writing-skills` TDD process — baseline pressure scenarios (RED), write the skill (GREEN), close loopholes (REFACTOR).
 
 **Tech Stack:** Markdown skill (Agent Skills spec), D2 diagram-as-code, `critique-loop` skill, `plannotator` CLI, Claude Code subagents (`Agent` tool) and Task/Todo tracking.
 

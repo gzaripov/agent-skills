@@ -21,35 +21,44 @@ Carry one feature from a BDD scenario, through architecture and design, into a s
 
 Violating the letter of a gate is violating the spirit of the process — a navigator APPROVE is never a substitute for developer approval. They are two separate, both-required gates.
 
-## The 5 phases
+## The 6 phases
 
 ### Phase 0 — Frame & track
 Derive a kebab-case `<slug>` from the request. Create `docs/features/<slug>/`. Confirm the working directory is a git repo on a feature branch (not `main`/`master`). Create a Task/Todo list with one entry per phase **and per gate** — the developer watches this list.
 
-### Phase 1 — Discovery & Scenario (BDD)
+### Phase 1 — Discovery & Scenarios (BDD)
 **REQUIRED BACKGROUND:** `references/scenarios.md` — read before writing scenarios.
 
-Dispatch parallel `Explore` subagents to survey where the feature lands and what it touches. Synthesize. Write `docs/features/<slug>/scenarios.md` — declarative `Given/When/Then`, ubiquitous language, one observable behavior per scenario, plus a "How it lands in the product" section.
+Dispatch parallel `Explore` subagents to survey where the feature lands and what it touches. Before drafting any scenario, grep prior PRDs for canonical domain terms (`grep -l "^## Domain Terms" docs/features/*/prd.md`) and reuse them — see `references/scenarios.md` § *Before you write*. Synthesize the survey. Write `docs/features/<slug>/scenarios.md` — declarative `Given/When/Then`, ubiquitous language, one observable behavior per scenario, plus a "How it lands in the product" section.
 
-### Phase 2 — Scenario Review Gate (two approvals)
+### Phase 2 — PRD Synthesis
+**REQUIRED BACKGROUND:** `references/prd.md` — read before writing the PRD.
+
+Synthesize the conversation, the survey, and `scenarios.md` into `docs/features/<slug>/prd.md`. Do **not** re-interview the developer in this phase; surface gaps as Open Questions for the gate. The PRD must include a **`## Domain Terms`** section that names every domain concept the feature touches — definitions are short, opinionated, with rejected aliases under `_Avoid_:`. If you are deliberately redefining a term from a prior PRD, list it in **`## Aliased Terms`** with the prior PRD's path. Each User Story is tagged with the scenarios in `scenarios.md` that verify it.
+
+### Phase 3 — Product Review Gate (two approvals)
 **REQUIRED SUB-SKILL:** `critique-loop` (review-only flow).
 
-1. **Navigator review** — run `critique-loop`'s review-only flow against `scenarios.md` with slug `<slug>-scenarios` (see **Calling critique-loop**). Resolve code/scope asks directly; surface product asks to the developer.
-2. **Developer review** — run `plannotator annotate docs/features/<slug>/scenarios.md`. Address **every** returned annotation. An inline chat message is not this gate.
-3. Advance to Phase 3 only after both an APPROVE verdict and **explicit** developer approval.
+Reviews `scenarios.md` and `prd.md` together — they are one product framing, gated as one.
 
-### Phase 3 — Architecture & Design
-**REQUIRED BACKGROUND:** `references/architecture.md` — read before surveying or diagramming.
+1. **Navigator review** — run `critique-loop`'s review-only flow against both files with slug `<slug>-product` (see **Calling critique-loop**). Resolve code/scope asks directly; surface product asks to the developer.
+2. **Developer review** — run `plannotator annotate docs/features/<slug>/scenarios.md` and `plannotator annotate docs/features/<slug>/prd.md`. Address **every** returned annotation on each. An inline chat message is not this gate.
+3. Advance to Phase 4 only after both an APPROVE verdict and **explicit** developer approval on both files.
 
-Dispatch parallel subagents to survey the existing architecture. Draft the architecture diagram in **both D2 and Mermaid**, render each, **look at both renders and keep whichever reads more clearly** (never embed a diagram you have not looked at) — see `references/architecture.md`. Embed the chosen diagram in `design.md`: a ` ```mermaid ` block (GitHub renders it inline) or the rendered D2 SVGs. Write `docs/features/<slug>/design.md`: components, interfaces, data flow, error handling, tradeoffs, and the **implementation stage breakdown**.
+### Phase 4 — Architecture & Design
+**REQUIRED BACKGROUND:** `references/architecture.md` — read before surveying, diagramming, or considering ADRs.
 
-### Phase 4 — Design Review Gate (two approvals)
-Same shape as Phase 2:
-1. **Navigator review** — `critique-loop` review-only flow on `design.md` with slug `<slug>-design` (see **Calling critique-loop**). Resolve code/scope asks directly; surface architecture and product tradeoffs to the developer.
+Dispatch parallel subagents to survey the existing architecture, and skim any existing entries in `docs/adr/` that touch this area. Draft the architecture diagram in **both D2 and Mermaid**, render each, **look at both renders and keep whichever reads more clearly** (never embed a diagram you have not looked at) — see `references/architecture.md`. Embed the chosen diagram in `design.md`: a ` ```mermaid ` block (GitHub renders it inline) or the rendered D2 SVGs. Write `docs/features/<slug>/design.md`: components, interfaces, data flow, error handling, tradeoffs, and the **implementation stage breakdown**.
+
+For any decision that meets **all three** ADR criteria — hard-to-reverse, surprising-without-context, the result of a real trade-off — write a new entry under `docs/adr/NNNN-<slug>.md` (sequential numbering; lazily create `docs/adr/` if missing). Most design decisions do not warrant an ADR; offer one only when all three are true. See `references/architecture.md` § *Architecture Decision Records*. ADRs are committed alongside `design.md` in the same `docs:` commit.
+
+### Phase 5 — Design Review Gate (two approvals)
+Same shape as Phase 3:
+1. **Navigator review** — `critique-loop` review-only flow on `design.md` (and any new ADRs) with slug `<slug>-design` (see **Calling critique-loop**). Resolve code/scope asks directly; surface architecture and product tradeoffs to the developer.
 2. **Developer review** — `plannotator annotate docs/features/<slug>/design.md`; address every annotation.
-3. Advance to Phase 5 only after both an APPROVE verdict and explicit developer approval.
+3. Advance to Phase 6 only after both an APPROVE verdict and explicit developer approval.
 
-### Phase 5 — Staged Implementation
+### Phase 6 — Staged Implementation
 **REQUIRED BACKGROUND:** `references/implementation.md` — read before the first stage.
 
 For each stage in the design's breakdown, run the double-loop TDD cycle:
@@ -108,14 +117,18 @@ If you catch yourself thinking any of these, a gate is about to be skipped:
 
 ```
 docs/features/<slug>/
-  scenarios.md
-  design.md
+  scenarios.md                      # Phase 1
+  prd.md                            # Phase 2 — includes ## Domain Terms (and ## Aliased Terms when redefining)
+  design.md                         # Phase 4
   diagrams/architecture.d2          # current + proposed states in one file
   diagrams/architecture-current.svg
   diagrams/architecture-proposed.svg
+
+docs/adr/                           # Phase 4 — lazily created when the first ADR is needed
+  NNNN-<slug>.md                    # sequentially numbered
 ```
 
-Commit artifacts with `docs:` conventional commits. `critique-loop`'s `.critique-loop/` scratch stays gitignored.
+Commit artifacts with `docs:` conventional commits. ADRs created in Phase 4 are committed together with `design.md` in the same commit. `critique-loop`'s `.critique-loop/` scratch stays gitignored.
 
 ## Calling critique-loop
 
@@ -123,10 +136,10 @@ Commit artifacts with `docs:` conventional commits. `critique-loop`'s `.critique
 
 | Call | Slug |
 |---|---|
-| Phase 2 — scenarios review | `<slug>-scenarios` |
-| Phase 4 — design review | `<slug>-design` |
-| Phase 5 — stage N review | `<slug>-stage-N` |
-| Phase 5 — final whole-diff review | `<slug>-final` |
+| Phase 3 — product (scenarios + PRD) review | `<slug>-product` |
+| Phase 5 — design (and any new ADRs) review | `<slug>-design` |
+| Phase 6 — stage N review | `<slug>-stage-N` |
+| Phase 6 — final whole-diff review | `<slug>-final` |
 
 Each slug gets its own `critique-loop` session, so reviews stay independent and their artifacts do not collide.
 

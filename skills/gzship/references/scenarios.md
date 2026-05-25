@@ -7,14 +7,44 @@ the feature, written before any architecture or code. A scenario is *a concrete
 example of system behavior from a user's perspective* — the spec, the acceptance
 criteria, and living documentation in one.
 
-`scenarios.md` is reviewed at the **Phase 2 gate**: a cross-model navigator — run
-through the `critique-loop` skill (e.g. Codex) — reviews it adversarially, and the
-developer must also approve it, before architecture begins. Write it to survive
-that review.
+`scenarios.md` feeds straight into Phase 2 (PRD synthesis), where it is paired
+with `docs/features/<slug>/prd.md`; both are reviewed together at the
+**Phase 3 gate**: a cross-model navigator — run through the `critique-loop`
+skill (e.g. Codex) — reviews them adversarially, and the developer must also
+approve, before architecture begins. Write the scenarios to survive that joint
+review.
 
 This file has two parts: **Rules** that every scenario must obey, and
 **Recommendations** applied with judgment. Follow the rules always; reach for the
 recommendations when they fit.
+
+## Before you write — gather the vocabulary
+
+Scenarios must use the same terms as every prior feature in the repo, or the
+ubiquitous language drifts and reviewers can't pattern-match against earlier
+work. Before drafting a scenario:
+
+1. **Grep prior PRDs for the canonical terms**:
+
+   ```sh
+   grep -l "^## Domain Terms" docs/features/*/prd.md
+   ```
+
+   Read each match's `## Domain Terms` section. These are the canonical names
+   for concepts in this codebase — reuse them verbatim in scenarios, including
+   the `_Avoid_:` aliases (write the canonical term, not the avoided one).
+
+2. **If a concept the feature touches has no name yet,** that's fine — the
+   Phase 2 PRD is where you'll introduce it. Pick a tight, opinionated name now
+   and use it consistently across the scenarios; you'll formalize it in the
+   PRD's Domain Terms section.
+
+3. **If you are deliberately redefining a prior PRD's term,** note it for the
+   PRD's **Aliased Terms** section (see `references/prd.md`). Silent overload of
+   a vocabulary term is a defect; explicit aliasing is fine.
+
+Terms gathered here flow downstream — into `prd.md` Domain Terms, into the
+design's component names, into test names, into code identifiers. Pick well.
 
 ## Rules — always
 
@@ -36,7 +66,9 @@ A scenario that breaks one of these is defective; fix it before the gate.
    state, framework calls.
 6. **Use the domain's ubiquitous language.** Every noun and verb is a business term
    shared by business, development, and testing — the same words the design and
-   code will use.
+   code will use. Reuse canonical terms from prior PRDs' `## Domain Terms`
+   sections (see *Before you write*); introduce new ones consistently and
+   formalize them in the Phase 2 PRD.
 7. **Each scenario stands alone.** It is understandable by someone who has never
    seen the feature, depends on no other scenario's leftover state, and passes in
    any order.

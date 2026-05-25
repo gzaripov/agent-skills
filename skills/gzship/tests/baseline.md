@@ -3,6 +3,16 @@
 Test record for the `gzship` skill, following the `writing-skills` TDD process:
 RED (baseline, no skill) → GREEN (with skill) → REFACTOR (close loopholes).
 
+> **Note (2026-05-25 update).** This record was captured against the 5-phase
+> version of `gzship` (Phase 1 Scenarios · 2 Scenario Review · 3 Design ·
+> 4 Design Review · 5 Implementation). The skill has since been extended to 6
+> phases — a new **Phase 2 PRD Synthesis** was inserted, the scenario gate moved
+> to Phase 3 (now also covers the PRD), the design moved to Phase 4, the design
+> gate to Phase 5, and implementation to Phase 6. The quoted subagent decisions
+> below reference the older phase numbers. The discipline targets and outcomes
+> are unchanged — the load-bearing rules (no skipping the developer gate,
+> test-first, no scope creep) survive the renumbering.
+
 The discipline targets (from `DESIGN.md`):
 
 - A — skipping the developer-approval gate after a navigator approval;
