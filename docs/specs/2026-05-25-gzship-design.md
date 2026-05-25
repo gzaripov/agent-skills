@@ -8,7 +8,7 @@
 
 `gzship` is a Claude-Code-first skill that walks a single feature from a fresh idea to merged code through seven gated phases: discover, PRD, review-A, design, review-B, slice, implement. Each phase produces a committed artifact in `docs/features/<slug>/` (or `docs/adr/` for ADRs). Adversarial reviews are delegated to the existing `critique-loop` skill. Architecture is illustrated with D2 diagrams (current vs. proposed). Implementation runs as vertical-slice tracer bullets with strict per-slice RED→GREEN TDD; subagents fan out for parallel codebase surveys and (when a feature has 5+ slices) for per-slice implementation.
 
-The skill is **self-contained** — it adopts conventions popularised by `mattpocock/skills` (`CONTEXT.md` glossary, `docs/adr/`, the PRD template, vertical-slice tracer bullets, deep-module vocabulary) but does not depend on that plugin being installed. Missing files are seeded lazily on first use.
+The skill adopts conventions popularised by `mattpocock/skills` (`CONTEXT.md` glossary, `docs/adr/`, the PRD template, vertical-slice tracer bullets, deep-module vocabulary) but **does not depend on `mattpocock/skills` being installed** — the relevant rules are inlined and missing repo files (`CONTEXT.md`, `docs/adr/`) are seeded lazily on first use. The one hard external dependency is `critique-loop` (same repo), which powers every review gate.
 
 ## Goals
 
