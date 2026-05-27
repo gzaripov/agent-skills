@@ -1,6 +1,6 @@
 # Diagrams — Mermaid conventions for tours
 
-Reference for Phase 4 of the `gzreview` skill. Read before rendering. Every rule below has cost a Plannotator round.
+Reference for Phase 2 (Draft) of the `gzreview` skill. Read before rendering. Every rule below has cost a Plannotator round.
 
 ## Why Mermaid, not D2 (and not external SVGs)
 
@@ -14,8 +14,8 @@ If you must use D2 (e.g. you have a directed-graph-with-clusters that Mermaid ca
 
 Don't aim for three. Aim for the ones that *change the reader's understanding*. A tour with zero diagrams and great prose is better than a tour with three filler diagrams.
 
-1. **Architecture overview** — `flowchart LR`. Shows the new abstractions and how they relate. Goes right after the abstractions section, before the injection sites.
-2. **Primary flow** — `sequenceDiagram`. Shows the happy-path interaction across the new code. Goes inside the injection site that owns it.
+1. **Architecture overview** — `flowchart LR`. Shows the new abstractions / changed shape and how they relate. Goes right after the type-specific body's main section (the abstractions, the fix, the shape-after, etc.) and before the *Where it's used* section when one exists.
+2. **Primary flow** — `sequenceDiagram`. Shows the happy-path / fix-path / new-code-path interaction across the change. Goes inside the section it explains (a *Where it's used* subsection for feature branches, the *The fix* section for bug-fix branches, the *What changed* section for perf branches).
 3. **Lifecycle / write-path** — `sequenceDiagram`. Shows how the abstraction is persisted, invalidated, and kept honest. Goes in the cross-cutting section.
 
 Skip any that doesn't show something the prose can't.
