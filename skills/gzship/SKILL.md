@@ -69,7 +69,9 @@ Write `docs/features/<slug>/design.md`. It must include **all** of these require
 
 The implementation slice breakdown does **not** live here — it is the Phase 6 deliverable (`plan.md`). The design feeds the plan; the plan does not feed back into the design.
 
-For any decision that meets **all three** ADR criteria — hard-to-reverse, surprising-without-context, the result of a real trade-off — write a new entry under `docs/adr/NNNN-<slug>.md` (sequential numbering; lazily create `docs/adr/` if missing). Most design decisions do not warrant an ADR; offer one only when all three are true. The tight 1–3-sentence template is the default; add the optional **Revisit conditions** section when the trigger to reopen the decision is nameable. See `references/architecture.md` § *Architecture Decision Records*. ADRs are committed alongside `design.md` in the same `docs:` commit.
+For any decision that meets **all three** ADR criteria — hard-to-reverse, surprising-without-context, the result of a real trade-off — write a new entry under `docs/adr/NNNN-<slug>.md` (sequential numbering; lazily create `docs/adr/` if missing). Most design decisions do not warrant an ADR; offer one only when all three are true. The tight 1–3-sentence template is the default; add the optional **Revisit conditions** section when the trigger to reopen the decision is nameable. See `references/architecture.md` § *Architecture Decision Records*.
+
+ADRs and `design.md` are **bidirectionally linked**: each new ADR's header carries an `Originating feature: docs/features/<slug>/` backlink, and `design.md` gains an `## ADRs produced` section listing every ADR this feature wrote. ADRs are committed alongside `design.md` in the same `docs:` commit; both directions of the link land together and are reviewed at the Phase 5 gate.
 
 ### Phase 5 — Design Review Gate (two approvals)
 Same shape as Phase 3:

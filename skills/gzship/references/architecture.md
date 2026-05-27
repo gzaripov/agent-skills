@@ -325,11 +325,18 @@ Template:
 ```md
 # <Short title of the decision>
 
+> *Originating feature:* `docs/features/<slug>/`
+
 <1–3 sentences: what's the context, what did we decide, and why.>
 ```
 
-That's it. An ADR can be a single paragraph. The value is in recording *that*
-a decision was made and *why* — not in filling out sections.
+The `Originating feature:` line is **required**. ADRs outlive features by
+design, but knowing which feature introduced the decision is load-bearing for
+future readers — it gives them the context to understand *why* the decision was
+made and which review captured it.
+
+An ADR body can otherwise be a single paragraph. The value is in recording
+*that* a decision was made and *why* — not in filling out sections.
 
 **Optional sections** — include only when they add genuine value; most ADRs
 will not need them:
@@ -347,11 +354,39 @@ will not need them:
   the trigger is honest about that. Add this section when the trigger is
   actually nameable; skip it when the decision is genuinely durable.
 
+### Bidirectional linking
+
+Every ADR a feature produces must be discoverable from both directions:
+
+**Forward (feature → ADR).** Add an **`## ADRs produced`** section to
+`design.md` listing every new ADR this feature wrote, with the path relative
+to `docs/features/<slug>/design.md` and a one-line summary of what was
+decided:
+
+```md
+## ADRs produced
+
+- [ADR-0017 — Postgres for the write model](../../adr/0017-postgres-for-write-model.md) — chose Postgres
+  over DynamoDB for the balance table because of strong-read requirements at checkout.
+- [ADR-0018 — Async balance projection](../../adr/0018-async-balance-projection.md) — checkout reads a
+  projection rather than the write model; accepting up-to-60 s drift for read-path availability.
+```
+
+If the feature produces no ADRs, omit the section. Do not write an empty
+`## ADRs produced` with the text "none" — its absence is the signal.
+
+**Backward (ADR → feature).** The `Originating feature:` line in the ADR
+template (above) carries the path back. One ADR → one originating feature.
+If a later feature *amends* the decision, it writes a new ADR that supersedes
+the old one (set `Status: superseded by ADR-NNNN` on the original); the
+amending ADR's `Originating feature:` points to the new feature.
+
 ### Commit alongside the design
 
 ADRs created during Phase 4 are committed together with `design.md` in the
-same `docs:` conventional commit (e.g. `docs: design for <slug>`). They are
-reviewed at the **Phase 5 gate** alongside the design.
+same `docs:` conventional commit (e.g. `docs: design for <slug>`). The
+forward links in `design.md` and the backlinks in each ADR header land in
+the same commit and are reviewed at the **Phase 5 gate** alongside the design.
 
 ## Anti-patterns
 
