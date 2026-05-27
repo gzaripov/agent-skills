@@ -1,16 +1,21 @@
-# Staged TDD implementation — `gzship` Phase 6 reference
+# Staged TDD implementation — `gzship` Phase 8 reference
 
 ## Purpose
 
-Phase 6 turns the approved `design.md` into shipped code, one stage at a time, with
-tests written first. Read this file before the first stage, then run the per-stage
-cycle for every stage in the design's implementation stage breakdown. Every stage's
-diff — and the whole feature at the end — is reviewed by a cross-model navigator,
-run through the `critique-loop` skill (e.g. Codex); see *The per-stage cycle* and
-*Final review*.
+Phase 8 turns the approved `plan.md` into shipped code, one **slice** at a time,
+with tests written first. Read this file before the first slice, then run the
+per-slice cycle for every slice in `plan.md`. Every slice's diff — and the whole
+feature at the end — is reviewed by a cross-model navigator, run through the
+`critique-loop` skill (e.g. Codex); see *The per-slice cycle* and *Final review*.
 
-It has two parts: **Rules** every stage must obey, and **Recommendations** applied
-with judgment.
+`plan.md` is the contract this phase executes against: each slice's acceptance
+criteria are the bar for "done", each slice's behavioral description is what the
+tests target, and each slice's `Blocked by` field gates ordering. The design
+phase produced the architecture this code lives inside; the plan phase produced
+the order. This phase produces the code.
+
+It has two parts: **Rules** every slice must obey, and **Recommendations**
+applied with judgment.
 
 ## Guiding principle
 
@@ -22,7 +27,7 @@ is highest for **integration** tests — that is the default; see Rule 2.
 
 ## Rules — always
 
-A stage that breaks one of these is not done.
+A slice that breaks one of these is not done.
 
 1. **Read the repo's existing tests first.** Match the framework, directory layout,
    fixtures, naming, and assertion style already in use. Do not introduce a second,
@@ -75,58 +80,62 @@ A stage that breaks one of these is not done.
 
 Implementation runs two nested loops — *outside-in*.
 
-- **Outer loop — the acceptance test.** Express the stage's BDD scenario as a
-  failing acceptance test. It states the observable behavior the stage must deliver
-  and stays red until the stage is done.
+- **Outer loop — the acceptance test.** Express the slice's BDD scenario as a
+  failing acceptance test. It states the observable behavior the slice must deliver
+  and stays red until the slice is done.
 - **Inner loop — unit red-green-refactor.** Inside the failing acceptance test,
   drive the implementation with small tests: write a failing test (RED), write the
   minimal code to pass it (GREEN), refactor under green (REFACTOR).
 
 Stay in the inner loop — one test, one slice of code, one refactor — until the
-outer acceptance test passes. That is the signal the stage is behaviorally complete.
+outer acceptance test passes. That is the signal the slice is behaviorally complete.
 
-## The per-stage cycle
+## The per-slice cycle
 
-Run these in order for one stage. Steps 1–2 happen before any production code.
+Run these in order for one slice. Steps 1–2 happen before any production code.
 
-1. **Acceptance test, RED.** Write the acceptance test for the stage's scenario;
+1. **Acceptance test, RED.** Write the acceptance test for the slice's scenario;
    run it and watch it fail.
 2. **Unit/inner test, RED.** Write one test for the next slice of behavior; run it
    and watch it fail.
 3. **Minimal code, GREEN.** Write the least production code that passes the test.
 4. **Refactor.** With tests green, clean up code and tests; behavior unchanged.
 5. **Repeat the inner loop** from step 2 until the acceptance test passes.
-6. **Review.** Run `critique-loop`'s review-only flow on the stage diff. Resolve
+6. **Review.** Run `critique-loop`'s review-only flow on the slice diff. Resolve
    code-level asks directly; surface architecture/product asks to the developer.
-7. **Proceed.** Mark the stage's task done and move on.
+7. **Proceed.** Mark the slice's task done and move on.
 
-## Stage decomposition
+## Slice execution — driven by `plan.md`
 
-Refine the design's stage breakdown with these heuristics:
+This phase does **not** decompose the feature into slices — that is `plan.md`'s
+job, already approved at the Phase 7 gate. This phase executes them.
 
-- **One coherent slice of behavior per stage** — ideally one acceptance test.
-- **One stage ≈ one logical commit** — a single reviewable, self-consistent change.
+Sanity-check each slice before starting, against the heuristics that should
+already hold in `plan.md` (see `references/plan.md`):
+
+- **One coherent piece of behavior per slice** — ideally one acceptance test.
+- **One slice ≈ one logical commit** — a single reviewable, self-consistent change.
 - **Independently testable** — drivable red-green on its own, with at most
   stubs/fakes for not-yet-built collaborators.
 - **Ordered so each builds on the last** — no forward references.
 - **Small enough to hold in context** — if not, split it.
 
-## Subagent-per-stage escalation
+## Subagent-per-slice escalation
 
-When the breakdown has **5 or more stages**, dispatch each stage to its own fresh
+When the breakdown has **5 or more slices**, dispatch each slice to its own fresh
 subagent to keep the controller's context lean.
 
-- **Hand the subagent** the stage spec, the relevant scenario(s), `design.md`, and
-  the prior stage's result (what was built, key decisions, the diff).
-- **The subagent runs the full per-stage cycle** and reports what it built, the
+- **Hand the subagent** the slice spec, the relevant scenario(s), `design.md`, and
+  the prior slice's result (what was built, key decisions, the diff).
+- **The subagent runs the full per-slice cycle** and reports what it built, the
   diff, test results, and any deferred observations.
 - **The controller verifies before continuing** — tests pass, the diff matches the
-  stage spec and stays in scope, the `critique-loop` review was run and resolved.
+  slice spec and stays in scope, the `critique-loop` review was run and resolved.
   A subagent's self-report does not replace this check.
 
 ## Final review
 
-After the last stage:
+After the last slice:
 
 1. Run one `critique-loop` review of the **whole feature diff**.
 2. Handle the verdict like any gate — resolve `CHANGES_REQUESTED` and re-review;

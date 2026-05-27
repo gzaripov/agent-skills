@@ -177,18 +177,98 @@ diagram source and embed it as a fenced code block so it is reviewable as text.
 
 - **Context & scope** — the problem and the current architecture it lands in.
 - **Goals / Non-Goals** — explicit bullets (Rule 2).
+- **System Analysis** *(required — see below)* — what exists today: the
+  modules in the path, the key data flow as-is, current load vs. PRD Quality
+  Targets, prior art the design must respect.
 - **Components & interfaces** — the units added or changed, with the contract
   (signature, inputs, outputs) at each boundary.
 - **Data flow** — the path a request/event takes through the proposed design.
+- **Integration & Data Ownership** *(required — see below)* — the explicit
+  per-call communication style (sync / async / streaming) and per-entity
+  ownership (who owns it, who has projections, what consistency model).
 - **Diagrams** — current and proposed, embedded (see above).
 - **Alternatives considered** — incl. "do nothing", with rejection reasons (Rule 4).
 - **Tradeoffs** — what the chosen design costs (Rule 5).
 - **Error handling & failure modes** — how each failure is detected and handled.
+- **Risks** *(required — see below)* — risk register tied to scenarios and
+  Quality Targets, with mitigation or accepted-as-is for each.
 - **Assumptions & open questions** — explicit (Rules 6, 7).
-- **Implementation stage breakdown** — the feature split into ordered,
-  independently testable stages, each small enough for one double-loop TDD cycle.
-  Drives Phase 6; if it has **5 or more stages**, each is dispatched to its own
-  subagent.
+
+The implementation slice breakdown does **not** live here — it is the Phase 6
+deliverable (`plan.md`). The design feeds into the plan; the plan does not
+feed back.
+
+### System Analysis (the as-is)
+
+The design must open by describing the system as it stands today, scoped to the
+area the feature touches. This is the "as-is" the course calls non-negotiable.
+Include:
+
+- **Modules in the path** — names + one-line responsibility each. Match
+  `CONTEXT.md`-style language used elsewhere in the repo (or the canonical
+  Domain Terms from the PRD).
+- **Key flow as-is** — for the most important scenario, the path a request /
+  event takes today: which module does what, where data is read/written,
+  which calls are synchronous vs. asynchronous, where external systems sit.
+- **Current load vs. PRD Quality Targets** — for each quality the PRD names a
+  target for (latency, RPS, volume, availability), state what we know about
+  today's behavior in the same dimension. Honest "unknown — need measurement"
+  is better than invented numbers.
+- **Prior art** — the closest existing feature/pattern this design should
+  match. Copying the resident shape is cheaper than inventing one.
+
+A design that proposes change without this as-is description is rejected at the
+gate — it is designing against an unknown system.
+
+### Integration & Data Ownership
+
+For any cross-module call the design introduces or changes, name two things:
+
+**(a) Integration style and why.** One of:
+
+- **Synchronous RPC/REST** — simple, but couples caller and callee; cascading
+  failure on the callee's outage; the caller's latency budget includes the
+  callee's. Pick when an immediate answer is required and the callee's
+  availability is acceptable to the caller's SLO.
+- **Asynchronous command/event** — loose coupling, callee outage doesn't break
+  the caller, but the system becomes eventually consistent and idempotency
+  must be designed in. Pick when no immediate answer is required, or when
+  callee availability is below caller SLO.
+- **Streaming data** — the stream itself is the contract; callee maintains a
+  projection of the source of truth. Pick when many consumers need the same
+  state, or the callee's read pattern is hot.
+- **Shared database** — almost always wrong; lists it only to explicitly
+  reject it with a reason.
+
+**(b) Data ownership per entity.** For each domain entity the feature touches:
+
+- **Owner** — exactly one module owns this entity's source of truth.
+- **Consumers** — other modules holding projections / copies, and how they
+  stay in sync (event subscription, CDC, on-demand fetch).
+- **Consistency model** — strong / read-your-writes / eventual / monotonic.
+  Make the trade-off explicit.
+
+A design that leaves integration style or data ownership implicit will hit
+exactly those questions at production-incident time — better to make them
+review-time decisions.
+
+### Risks
+
+A table at the end of `design.md`, one row per risk. Tie each risk to the
+scenario(s) it threatens and the Quality Target(s) it hits. Mitigation is
+either a concrete plan or an explicit *accept-as-is* with a reason.
+
+| Risk | Scenario(s) it threatens | Quality hit | Mitigation |
+|---|---|---|---|
+| Order-service outage cascades to checkout | Scenario 3 | Availability (99.5% target) | Async event with idempotent retry; checkout degrades to "we'll confirm by email" instead of failing |
+| Catalog price drift between cache and source | Scenario 5 | Read consistency | Cache TTL ≤ 60s; explicit version field; *accepting* 60s drift |
+| New PII table without DPO sign-off | — | Regulatory (GDPR) | Hold until DPO approval; track as open question |
+
+Categories to scan for: **technological** (stale stack, single point of
+failure, dangerous integration), **organisational** (one team owns too much,
+no clear owner), **domain** (a module knows another's logic), **data**
+(no source of truth, divergent copies). Sized to the change — a small
+feature may have one or two rows; a system-shape change may have ten.
 
 ## Architecture Decision Records (ADRs)
 
@@ -260,6 +340,12 @@ will not need them:
   remembering.
 - **Consequences** — only when non-obvious downstream effects need to be
   called out.
+- **Revisit conditions** — the triggers that should make a future reader reopen
+  this decision. *"Reopen this when monthly write volume exceeds 1 M rows,"* or
+  *"reopen this when the Payments team is staffed to own an idempotency layer
+  themselves."* Better than a quiet *"this is final"* — decisions age, and naming
+  the trigger is honest about that. Add this section when the trigger is
+  actually nameable; skip it when the decision is genuinely durable.
 
 ### Commit alongside the design
 

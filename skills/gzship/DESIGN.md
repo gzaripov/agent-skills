@@ -1,10 +1,10 @@
 # Design — `gzship` skill
 
-> **Status (2026-05-25):** Name chosen (`gzship`). Home: `gzaripov/agent-skills` monorepo at `skills/gzship/`. Extended on 2026-05-25 to add a **PRD Synthesis** phase, **Domain Terms** in the PRD (per-PRD, no separate `CONTEXT.md`), and **lazy ADR** seeding under `docs/adr/` — borrowing structure from mattpocock/skills while staying self-contained.
+> **Status (2026-05-27):** Name chosen (`gzship`). Home: `gzaripov/agent-skills` monorepo at `skills/gzship/`. Extended on 2026-05-25 to add a **PRD Synthesis** phase, **Domain Terms** in the PRD (per-PRD, no separate `CONTEXT.md`), and **lazy ADR** seeding under `docs/adr/`. Extended again on 2026-05-27 (v2) with course-grade additions: **Quality Targets / Constraints / Stakeholders Consulted** in the PRD; **System Analysis / Risks / Integration & Data Ownership** in the design; optional **Revisit conditions** in ADRs; a new **Phase 6 Plan Synthesis** that produces `plan.md` (vertical-slice tracer bullets) and a new **Phase 7 Plan Review Gate**.
 
 ## Core principle
 
-A **Claude-Code-first** skill that carries a single feature from a **BDD scenario → PRD → architecture/design → staged TDD implementation**. Every phase produces exactly one artifact, and **no phase advances until both the navigator (cross-model review) and the developer have approved that artifact.** The flow is outside-in: behavior first, product framing second, architecture third, code last.
+A **Claude-Code-first** skill that carries a single feature from a **BDD scenario → PRD → architecture/design → execution plan → vertical-slice TDD implementation**. Every phase produces exactly one artifact, and **no phase advances until both the navigator (cross-model review) and the developer have approved that artifact.** The flow is outside-in: behavior first, product framing second, architecture third, plan fourth, code last.
 
 ## Scope and non-goals
 
@@ -17,17 +17,18 @@ A **Claude-Code-first** skill that carries a single feature from a **BDD scenari
 
 ```
 skills/gzship/
-  SKILL.md                  # orchestrator: 6 phases, gates, subagent dispatch
+  SKILL.md                  # orchestrator: 8 phases, gates, subagent dispatch
   references/
     scenarios.md            # BDD scenario writing — book-derived practices + prior-PRD term grep
-    prd.md                  # PRD template (Problem · Solution · Domain Terms · User Stories · Decisions · Testing · Scope) + Aliased Terms
-    architecture.md         # surveying existing code/architecture + D2 diagramming + ADR offer criteria
-    implementation.md       # double-loop TDD, stage decomposition, per-stage cycle
+    prd.md                  # PRD template (Stakeholders · Quality Targets · Constraints · Domain Terms · User Stories · Decisions · Testing · Scope) + Aliased Terms
+    architecture.md         # System Analysis + to-be architecture + D2 diagramming + Integration & Data Ownership + Risks + ADR offer criteria & optional Revisit conditions
+    plan.md                 # vertical-slice tracer bullets, AFK/HITL, acceptance criteria, horizontal-slicing forbidden
+    implementation.md       # double-loop TDD, per-slice cycle, subagent escalation when plan.md has 5+ slices
 ```
 
 `SKILL.md` is the orchestrator and stays lean. Each reference file holds the heavy how-to for one phase and is read only when that phase runs.
 
-## The 6 phases
+## The 8 phases
 
 ### Phase 0 — Frame & track
 Derive a kebab-case `<slug>` from the feature request. Create `docs/features/<slug>/`. Confirm the working directory is a git repo and the current branch is a feature branch (not `main`/`master`). Create a Task/Todo list with one entry per phase and per gate — this list is the "goal tracker" the developer can watch.
@@ -42,7 +43,10 @@ Derive a kebab-case `<slug>` from the feature request. Create `docs/features/<sl
 Synthesize the conversation, the Phase 1 survey, and `scenarios.md` into `docs/features/<slug>/prd.md` using the template in `references/prd.md`:
 
 - **Problem Statement / Solution** from the user's perspective.
-- **`## Domain Terms`** — every domain concept the feature touches, defined tightly (one or two sentences each), opinionated, with rejected aliases under `_Avoid_:`. This is the canonical vocabulary for everything downstream in this feature.
+- **`## Stakeholders Consulted`** — one honest line per voice that shaped the PRD. *"Primary developer (solo)"* is valid.
+- **`## Quality Targets`** — numeric NFRs (latency p95, RPS, data volume, availability %, durability class), tied to scenarios where applicable. No vague adjectives.
+- **`## Constraints`** — explicit rails (stack, deadline, regulatory, budget, team capacity).
+- **`## Domain Terms`** — every domain concept the feature touches, defined tightly (one or two sentences each), opinionated, with rejected aliases under `_Avoid_:`. Canonical vocabulary for everything downstream.
 - **`## Aliased Terms`** — only when deliberately redefining a prior PRD's term. Silent overload is forbidden.
 - **User Stories** tagged with the scenarios in `scenarios.md` that verify them.
 - **Implementation Decisions / Testing Decisions / Out of Scope** — no file paths or code snippets.
@@ -59,20 +63,31 @@ Reviews `scenarios.md` and `prd.md` together — one product framing, gated as o
 ### Phase 4 — Architecture & Design
 1. Dispatch parallel subagents to survey the **existing architecture**: current module boundaries, data flow, design patterns already in use, prior art for similar features. Skim existing entries in `docs/adr/` that touch this area.
 2. Produce two architecture diagrams — **current** and **proposed** — drafted in both D2 and Mermaid, rendered, the clearer of the two embedded in the design.
-3. Write `docs/features/<slug>/design.md`: components & interfaces, data flow, error handling, tradeoffs considered, and the **implementation stage breakdown**.
-4. **Write ADRs sparingly.** For any decision that is **hard-to-reverse**, **surprising-without-context**, and **the result of a real trade-off** (all three must hold), write a new entry under `docs/adr/NNNN-<slug>.md` — sequential numbering, lazily create `docs/adr/` if missing. ADRs are committed alongside `design.md` in the same `docs:` commit.
+3. Write `docs/features/<slug>/design.md`. Required sections (full detail in `references/architecture.md`):
+   - **`## System Analysis`** — the as-is (modules in the path, key flow as-is, current load vs. PRD Quality Targets, prior art).
+   - **`## Components & interfaces`** + **`## Data flow`** — the to-be.
+   - **`## Integration & Data Ownership`** — explicit per-call sync/async/streaming choice and per-entity ownership + consistency model.
+   - **`## Alternatives considered`** + **`## Tradeoffs`** + **`## Error handling`** + **`## Risks`** (table: risk · scenario · quality · mitigation) + **`## Assumptions & open questions`**.
+   - The implementation slice breakdown is **not** in `design.md` — it is the Phase 6 deliverable.
+4. **Write ADRs sparingly.** For any decision that is **hard-to-reverse**, **surprising-without-context**, and **the result of a real trade-off** (all three must hold), write a new entry under `docs/adr/NNNN-<slug>.md` — sequential numbering, lazily create `docs/adr/` if missing. Optional **Revisit conditions** section when the trigger to reopen the decision is nameable. ADRs are committed alongside `design.md` in the same `docs:` commit.
 
 ### Phase 5 — Design Review Gate
 Same shape as Phase 3: `critique-loop` review-only on `design.md` (and any new ADRs), resolve asks, surface architecture/product tradeoffs to the developer, then **developer review via Plannotator** (`plannotator annotate design.md`) — address every returned annotation, advance only on explicit approval. Both approvals required before Phase 6.
 
-### Phase 6 — Staged Implementation
-For each stage in the design's stage breakdown, run the **double-loop TDD** cycle:
-1. **Write tests** — an acceptance/behavior test for the stage's scenario (outer loop, RED), then unit tests (inner loop, RED).
-2. **Write code** — minimal code to green, then refactor.
-3. **Iterate with `critique-loop`** — review-only flow on the stage diff; resolve asks.
-4. **Proceed** — mark the stage's task done, move to the next stage.
+### Phase 6 — Plan Synthesis
+Decompose the approved `design.md` into **vertical-slice tracer bullets** and write `docs/features/<slug>/plan.md` using the template in `references/plan.md`. Each slice cuts every layer (schema → API → logic → UI → tests), is independently demoable, and is tagged AFK or HITL. Per slice: title, blocked-by, stories covered (`prd.md`), risks addressed (`design.md`), behavioral description, acceptance criteria checklist. The first slice is the tracer bullet (thinnest end-to-end path proving the system wires up). **Horizontal slicing is forbidden.**
 
-**Escalation:** if the design's stage breakdown has **5 or more stages**, dispatch each stage to its own fresh subagent (Approach 2) to keep the main context lean. After the final stage, run one `critique-loop` review of the whole feature diff and produce a summary report.
+### Phase 7 — Plan Review Gate
+Same shape as Phase 5: `critique-loop` review-only on `plan.md`, then `plannotator annotate plan.md`. Both approvals required before Phase 8.
+
+### Phase 8 — Staged Implementation
+For each slice in `plan.md`, run the **double-loop TDD** cycle:
+1. **Write tests** — acceptance test anchored to the slice's acceptance criteria (outer loop, RED), then unit tests (inner loop, RED).
+2. **Write code** — minimal code to green, then refactor.
+3. **Iterate with `critique-loop`** — review-only flow on the slice diff; resolve asks.
+4. **Proceed** — tick the slice's acceptance-criteria boxes in `plan.md`, mark the task done, move to the next slice.
+
+**Escalation:** if `plan.md` has **5 or more slices**, dispatch each slice to its own fresh subagent (Approach 2) to keep the main context lean. After the final slice, run one `critique-loop` review of the whole feature diff and produce a summary report.
 
 ## How reviews work — `critique-loop` integration
 
@@ -82,15 +97,16 @@ For each stage in the design's stage breakdown, run the **double-loop TDD** cycl
 
 ```
 docs/features/<slug>/
-  scenarios.md                      # Phase 1
-  prd.md                            # Phase 2 — includes ## Domain Terms (and ## Aliased Terms when redefining)
-  design.md                         # Phase 4
+  scenarios.md                      # Phase 1 — BDD scenarios
+  prd.md                            # Phase 2 — Stakeholders, Quality Targets, Constraints, Domain Terms (+ Aliased Terms when redefining)
+  design.md                         # Phase 4 — System Analysis, Components, Integration & Data Ownership, Risks
+  plan.md                           # Phase 6 — vertical-slice tracer bullets with AFK/HITL and acceptance criteria
   diagrams/architecture.d2          # current = base, proposed = D2 scenario
   diagrams/architecture-current.svg
   diagrams/architecture-proposed.svg
 
 docs/adr/                           # Phase 4 — lazily created when the first ADR is needed
-  NNNN-<slug>.md                    # sequentially numbered
+  NNNN-<slug>.md                    # sequentially numbered; optional Revisit conditions when nameable
 ```
 
 All committed with `docs:` conventional commits. ADRs created in Phase 4 are committed together with `design.md` in the same commit. `critique-loop`'s `.critique-loop/` review scratch stays gitignored and is not part of the feature.
@@ -111,8 +127,9 @@ All committed with `docs:` conventional commits. ADRs created in Phase 4 are com
 ## Reference file content (book-derived)
 
 - **`scenarios.md`** — from *BDD in Action* (John Ferguson Smart), *Specification by Example* (Gojko Adzic), *Discovery* (Seb Rose & Gáspár Nagy), *The Cucumber Book* (Wynne & Hellesøy): Three Amigos / Example Mapping, declarative scenarios, ubiquitous language, anti-patterns (imperative or UI-coupled scenarios), scenario outlines. Plus the prior-PRD term-grep discipline (no central `CONTEXT.md`).
-- **`prd.md`** — from mattpocock/skills' `to-prd` (PRD template: Problem · Solution · User Stories · Implementation Decisions · Testing Decisions · Out of Scope) and `grill-with-docs` (Domain Terms format adapted from `CONTEXT.md`); plus *Domain-Driven Design* (Eric Evans) for the ubiquitous-language motivation and *Inspired* (Marty Cagan) for "PRD as synthesis, not interview."
-- **`architecture.md`** — from *Working Effectively with Legacy Code* (Michael Feathers): seams, characterization tests, reading existing architecture before proposing changes; plus D2 syntax for architecture diagrams (containers, connections, `scenarios` for before/after) and install/fallback handling; plus mattpocock/skills' ADR offer criteria (hard-to-reverse + surprising + real trade-off) and tight 1–3-sentence ADR template.
+- **`prd.md`** — from mattpocock/skills' `to-prd` (PRD template: Problem · Solution · User Stories · Implementation Decisions · Testing Decisions · Out of Scope) and `grill-with-docs` (Domain Terms format adapted from `CONTEXT.md`); plus *Domain-Driven Design* (Eric Evans) for the ubiquitous-language motivation and *Inspired* (Marty Cagan) for "PRD as synthesis, not interview." Quality Targets, Constraints, and Stakeholders Consulted sections adopted from the systems-analysis course (requirements layer: business + functional + non-functional + constraints).
+- **`architecture.md`** — from *Working Effectively with Legacy Code* (Michael Feathers): seams, characterization tests, reading existing architecture before proposing changes; plus D2 syntax for architecture diagrams (containers, connections, `scenarios` for before/after) and install/fallback handling; plus mattpocock/skills' ADR offer criteria (hard-to-reverse + surprising + real trade-off) and tight 1–3-sentence ADR template. System Analysis, Risks register, Integration & Data Ownership sections, and ADR Revisit conditions all adopted from the systems-analysis course.
+- **`plan.md`** — from mattpocock/skills' `to-issues` (vertical-slice tracer bullets, AFK/HITL, acceptance criteria, blocked-by) and *The Pragmatic Programmer* (Hunt & Thomas) for the tracer-bullet metaphor; plus Kent Beck's vertical-slice TDD lifted from per-test to per-slice level.
 - **`implementation.md`** — from *Test-Driven Development by Example* (Kent Beck): red-green-refactor; *Growing Object-Oriented Software, Guided by Tests* (Freeman & Pryce): double-loop / outside-in TDD; plus stage decomposition heuristics and the subagent-per-stage escalation rule.
 
 ## Building `gzship` itself

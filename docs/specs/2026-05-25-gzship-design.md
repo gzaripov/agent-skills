@@ -4,10 +4,11 @@
 **Status:** Brainstorming snapshot — see *Implementation note* below
 **Author:** Brainstormed with Claude (Opus 4.7) on `gzship-skill` branch
 
-> **Implementation note (2026-05-25).** This spec captured the brainstorming output before the skill was assembled. The landed implementation differs in two ways from the original plan written below:
+> **Implementation note (updated 2026-05-27).** This spec captured the brainstorming output before the skill was assembled. The landed implementation differs in three ways from the original plan written below:
 >
 > 1. **Domain Terms live in the PRD, not in a separate `CONTEXT.md`.** A central `CONTEXT.md` would accumulate indefinitely and rot into a stale dictionary. Each PRD now carries its own `## Domain Terms` section, with cross-feature consistency preserved by Phase 1's prior-PRD grep and a `## Aliased Terms` section that flags deliberate redefinitions. References to `CONTEXT.md` below should be read as references to the PRD's Domain Terms section.
-> 2. **Six phases, not seven.** The original plan split *Slice* and *Implement* into two phases. The shipped skill folds the stage breakdown into the design doc itself (still authored in Phase 4, reviewed at Phase 5) and Phase 6 implements stage by stage. Mapping: old Phase 1 Discover = new Phase 1; old Phase 2 PRD = new Phase 2; old Phase 3 Review A = new Phase 3; old Phase 4 Design = new Phase 4 (with ADRs); old Phase 5 Review B = new Phase 5; old Phase 6 Slice merged into Phase 4 / driven in Phase 6; old Phase 7 Implement = new Phase 6.
+> 2. **Eight phases as of v2 (2026-05-27).** The first shipped version had six phases; v2 added a course-grade **Plan Synthesis** phase (writes `plan.md`) and a **Plan Review Gate**, lifting the slice breakdown out of `design.md` into its own reviewable artifact. The new PRD also gains Quality Targets / Constraints / Stakeholders sections; the new design gains System Analysis / Risks / Integration & Data Ownership; ADRs gain optional Revisit conditions. The original brainstorming split of *Slice* and *Implement* into separate phases is now the landed shape (Phase 6 Plan + Phase 8 Implement). Mapping from this spec's original 7-phase plan to the v2 landed shape: old Phase 1 Discover = new Phase 1; old Phase 2 PRD = new Phase 2; old Phase 3 Review A = new Phase 3; old Phase 4 Design = new Phase 4; old Phase 5 Review B = new Phase 5; old Phase 6 Slice = new Phase 6 (now called Plan Synthesis); new Phase 7 Plan Review Gate inserted; old Phase 7 Implement = new Phase 8.
+> 3. **No separate `analysis.md` — System Analysis is a section inside `design.md`.** v2 introduces the as-is description as a required `## System Analysis` section of `design.md` rather than its own file (deliberate choice to keep file count down while still requiring the content).
 >
 > **Authoritative current state:** `skills/gzship/SKILL.md` and `skills/gzship/DESIGN.md`. The brainstorming text below is preserved for context on the choices that landed.
 
@@ -34,16 +35,18 @@ The skill adopts conventions popularised by `mattpocock/skills` (the PRD templat
 - Not a code-review-of-existing-PRs tool. Use `critique-loop`'s review-only flow for that.
 - Not an issue-tracker integration. PRD lives only as a file under `docs/features/<slug>/prd.md`. No GitHub issue is created.
 
-## Phase overview (as landed — 6 phases)
+## Phase overview (as landed — 8 phases, v2)
 
 | # | Phase | Output | Gate |
 |---|---|---|---|
 | 1 | **Discover & Scenarios** | `docs/features/<slug>/scenarios.md` (vocabulary sourced from prior PRDs' `## Domain Terms`) | — |
-| 2 | **PRD Synthesis** | `docs/features/<slug>/prd.md` — includes `## Domain Terms` and (when redefining) `## Aliased Terms` | — |
-| 3 | **Product Review** (scenarios + PRD) | `critique-loop` review notes (gitignored) + `plannotator annotate` developer review | navigator `VERDICT: APPROVE` + explicit developer approval |
-| 4 | **Architecture & Design** | `docs/features/<slug>/design.md` + `diagrams/architecture.{d2,svg}` + new `docs/adr/NNNN-*.md` (if any) — design.md contains the stage breakdown | — |
-| 5 | **Design Review** | `critique-loop` review notes (gitignored) + `plannotator annotate` developer review | navigator `VERDICT: APPROVE` + explicit developer approval |
-| 6 | **Staged Implementation** | code + tests per stage; per-stage `critique-loop` review; one final whole-diff review | all stages green, all reviews `APPROVE` |
+| 2 | **PRD Synthesis** | `docs/features/<slug>/prd.md` — Stakeholders, Quality Targets, Constraints, Domain Terms (+ Aliased Terms when redefining) | — |
+| 3 | **Product Review** (scenarios + PRD) | `critique-loop` review notes + `plannotator annotate` developer review | navigator `VERDICT: APPROVE` + explicit developer approval |
+| 4 | **Architecture & Design** | `docs/features/<slug>/design.md` (System Analysis · Components · Integration & Data Ownership · Risks) + `diagrams/architecture.{d2,svg}` + new `docs/adr/NNNN-*.md` (if any; optional Revisit conditions) | — |
+| 5 | **Design Review** | `critique-loop` review notes + `plannotator annotate` developer review | navigator `VERDICT: APPROVE` + explicit developer approval |
+| 6 | **Plan Synthesis** | `docs/features/<slug>/plan.md` — vertical-slice tracer bullets with AFK/HITL tags, acceptance criteria, blocked-by, stories+risks tagged | — |
+| 7 | **Plan Review** | `critique-loop` review notes + `plannotator annotate` developer review | navigator `VERDICT: APPROVE` + explicit developer approval |
+| 8 | **Staged Implementation** | code + tests per slice; per-slice `critique-loop` review; one final whole-diff review | all slices green, all reviews `APPROVE` |
 
 The slug is the current git branch name; if on `main`/`master`, the skill asks for one.
 
@@ -59,7 +62,8 @@ The first time `gzship` runs against a repo, it creates whatever is missing:
 │   └── features/<slug>/              # one directory per feature
 │       ├── scenarios.md              # Phase 1
 │       ├── prd.md                    # Phase 2 — includes ## Domain Terms (and ## Aliased Terms when redefining)
-│       ├── design.md                 # Phase 4 — includes the implementation stage breakdown
+│       ├── design.md                 # Phase 4 — System Analysis, Components, Integration & Data Ownership, Risks
+│       ├── plan.md                   # Phase 6 — vertical-slice tracer bullets (AFK/HITL, acceptance criteria)
 │       └── diagrams/
 │           ├── architecture.d2       # Phase 4 source (current + proposed in one file)
 │           ├── architecture-current.svg
@@ -74,12 +78,13 @@ The first time `gzship` runs against a repo, it creates whatever is missing:
 
 ```
 skills/gzship/
-├── SKILL.md                  # orchestrator: 6 phases, gates, subagent dispatch, escalation rules
+├── SKILL.md                  # orchestrator: 8 phases, 3 gates, subagent dispatch, escalation rules
 └── references/
     ├── scenarios.md          # BDD scenarios (Gherkin, declarative, Three Amigos, Example Mapping) + prior-PRD Domain Terms grep
-    ├── prd.md                # PRD template (Problem · Solution · Domain Terms · Aliased Terms · User Stories · Implementation Decisions · Testing Decisions · Out of Scope)
-    ├── architecture.md       # Deep-modules vocab (module/interface/seam/adapter/depth/leverage/locality) + survey technique + deletion test + ADR offer criteria + D2 diagramming
-    └── implementation.md     # Double-loop TDD + stage decomposition + per-stage cycle + horizontal-slicing anti-pattern + subagent escalation (5+ stages)
+    ├── prd.md                # PRD template (Problem · Solution · Stakeholders · Quality Targets · Constraints · Domain Terms · Aliased Terms · User Stories · Implementation Decisions · Testing Decisions · Out of Scope)
+    ├── architecture.md       # System Analysis (as-is) + deep-modules vocab + survey + D2 diagramming + Integration & Data Ownership + Risks register + ADR offer criteria & optional Revisit conditions
+    ├── plan.md               # Vertical-slice tracer bullets (AFK vs HITL) + per-slice acceptance criteria + blocked-by + stories/risks tagging + horizontal-slicing anti-pattern + subagent escalation (5+ slices)
+    └── implementation.md     # Double-loop TDD + per-slice cycle (driven by plan.md)
 ```
 
 SKILL.md is the orchestrator. Reference files are loaded only when the corresponding phase runs (progressive disclosure). The skill should fit comfortably in context when only SKILL.md is loaded.

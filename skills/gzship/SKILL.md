@@ -21,7 +21,7 @@ Carry one feature from a BDD scenario, through architecture and design, into a s
 
 Violating the letter of a gate is violating the spirit of the process — a navigator APPROVE is never a substitute for developer approval. They are two separate, both-required gates.
 
-## The 6 phases
+## The 8 phases
 
 ### Phase 0 — Frame & track
 Derive a kebab-case `<slug>` from the request. Create `docs/features/<slug>/`. Confirm the working directory is a git repo on a feature branch (not `main`/`master`). Create a Task/Todo list with one entry per phase **and per gate** — the developer watches this list.
@@ -34,7 +34,16 @@ Dispatch parallel `Explore` subagents to survey where the feature lands and what
 ### Phase 2 — PRD Synthesis
 **REQUIRED BACKGROUND:** `references/prd.md` — read before writing the PRD.
 
-Synthesize the conversation, the survey, and `scenarios.md` into `docs/features/<slug>/prd.md`. Do **not** re-interview the developer in this phase; surface gaps as Open Questions for the gate. The PRD must include a **`## Domain Terms`** section that names every domain concept the feature touches — definitions are short, opinionated, with rejected aliases under `_Avoid_:`. If you are deliberately redefining a term from a prior PRD, list it in **`## Aliased Terms`** with the prior PRD's path. Each User Story is tagged with the scenarios in `scenarios.md` that verify it.
+Synthesize the conversation, the survey, and `scenarios.md` into `docs/features/<slug>/prd.md`. Do **not** re-interview the developer in this phase; surface gaps as Open Questions for the gate.
+
+The PRD must include **all** of these required sections (see `references/prd.md` for format detail):
+
+- **`## Stakeholders Consulted`** — one line per voice that actually shaped this PRD. *"Primary developer (solo)"* is a valid entry; the rule is honesty, not breadth.
+- **`## Quality Targets`** — numeric NFRs (latency p95, RPS, data volume, availability %, durability class), tied to scenarios where applicable. Adjectives like "fast" or "scalable" without numbers are rejected at the gate.
+- **`## Constraints`** — explicit rails the design must respect (stack, deadline, regulatory, budget, team).
+- **`## Domain Terms`** — canonical vocabulary for every domain concept the feature touches, with rejected aliases under `_Avoid_:`. If deliberately redefining a term from a prior PRD, list it in **`## Aliased Terms`** with the prior PRD's path.
+
+Each User Story is tagged with the scenarios in `scenarios.md` that verify it.
 
 ### Phase 3 — Product Review Gate (two approvals)
 **REQUIRED SUB-SKILL:** `critique-loop` (review-only flow).
@@ -48,9 +57,19 @@ Reviews `scenarios.md` and `prd.md` together — they are one product framing, g
 ### Phase 4 — Architecture & Design
 **REQUIRED BACKGROUND:** `references/architecture.md` — read before surveying, diagramming, or considering ADRs.
 
-Dispatch parallel subagents to survey the existing architecture, and skim any existing entries in `docs/adr/` that touch this area. Draft the architecture diagram in **both D2 and Mermaid**, render each, **look at both renders and keep whichever reads more clearly** (never embed a diagram you have not looked at) — see `references/architecture.md`. Embed the chosen diagram in `design.md`: a ` ```mermaid ` block (GitHub renders it inline) or the rendered D2 SVGs. Write `docs/features/<slug>/design.md`: components, interfaces, data flow, error handling, tradeoffs, and the **implementation stage breakdown**.
+Dispatch parallel subagents to survey the existing architecture, and skim any existing entries in `docs/adr/` that touch this area. Draft the architecture diagram in **both D2 and Mermaid**, render each, **look at both renders and keep whichever reads more clearly** (never embed a diagram you have not looked at) — see `references/architecture.md`. Embed the chosen diagram in `design.md`: a ` ```mermaid ` block (GitHub renders it inline) or the rendered D2 SVGs.
 
-For any decision that meets **all three** ADR criteria — hard-to-reverse, surprising-without-context, the result of a real trade-off — write a new entry under `docs/adr/NNNN-<slug>.md` (sequential numbering; lazily create `docs/adr/` if missing). Most design decisions do not warrant an ADR; offer one only when all three are true. See `references/architecture.md` § *Architecture Decision Records*. ADRs are committed alongside `design.md` in the same `docs:` commit.
+Write `docs/features/<slug>/design.md`. It must include **all** of these required sections (see `references/architecture.md` § *The design document* for format detail):
+
+- **`## System Analysis`** — the as-is: modules in the path, key flow as-is, current load vs. PRD Quality Targets, prior art.
+- **`## Components & interfaces`** + **`## Data flow`** — the to-be.
+- **`## Integration & Data Ownership`** — per cross-module call: sync REST / async event / streaming / shared DB and *why*; per entity: owner, projections, consistency model.
+- **`## Alternatives considered`** (incl. "do nothing") and **`## Tradeoffs`**.
+- **`## Risks`** — table linking each risk to the scenario it threatens, the Quality Target it hits, and a mitigation (or an explicit *accept-as-is*).
+
+The implementation slice breakdown does **not** live here — it is the Phase 6 deliverable (`plan.md`). The design feeds the plan; the plan does not feed back into the design.
+
+For any decision that meets **all three** ADR criteria — hard-to-reverse, surprising-without-context, the result of a real trade-off — write a new entry under `docs/adr/NNNN-<slug>.md` (sequential numbering; lazily create `docs/adr/` if missing). Most design decisions do not warrant an ADR; offer one only when all three are true. The tight 1–3-sentence template is the default; add the optional **Revisit conditions** section when the trigger to reopen the decision is nameable. See `references/architecture.md` § *Architecture Decision Records*. ADRs are committed alongside `design.md` in the same `docs:` commit.
 
 ### Phase 5 — Design Review Gate (two approvals)
 Same shape as Phase 3:
@@ -58,16 +77,29 @@ Same shape as Phase 3:
 2. **Developer review** — `plannotator annotate docs/features/<slug>/design.md`; address every annotation.
 3. Advance to Phase 6 only after both an APPROVE verdict and explicit developer approval.
 
-### Phase 6 — Staged Implementation
-**REQUIRED BACKGROUND:** `references/implementation.md` — read before the first stage.
+### Phase 6 — Plan Synthesis
+**REQUIRED BACKGROUND:** `references/plan.md` — read before decomposing into slices.
 
-For each stage in the design's breakdown, run the double-loop TDD cycle:
-1. **Tests first** — acceptance test (outer loop, RED), then unit tests (inner loop, RED).
+Decompose the approved `design.md` into **vertical-slice tracer bullets** and write `docs/features/<slug>/plan.md`. Each slice cuts every layer the feature touches (schema → API → logic → UI → tests) and is independently demoable. Per slice: title, AFK/HITL tag, blocked-by, stories covered (from `prd.md`), risks addressed (from `design.md` § Risks), behavioral description, and acceptance criteria as a checklist. The **first slice is the tracer bullet** — the thinnest end-to-end path that proves the system wires up. Subsequent slices thicken behavior along that path.
+
+Horizontal slicing — "all schema first, then all API, then all UI" — is explicitly forbidden; see `references/plan.md` for the rationale.
+
+### Phase 7 — Plan Review Gate (two approvals)
+Same shape as Phase 5:
+1. **Navigator review** — `critique-loop` review-only flow on `plan.md` with slug `<slug>-plan` (see **Calling critique-loop**). Resolve code/scope asks directly; surface ordering and HITL-resolution asks to the developer.
+2. **Developer review** — `plannotator annotate docs/features/<slug>/plan.md`; address every annotation.
+3. Advance to Phase 8 only after both an APPROVE verdict and explicit developer approval.
+
+### Phase 8 — Staged Implementation
+**REQUIRED BACKGROUND:** `references/implementation.md` — read before the first slice.
+
+For each slice in `plan.md`, run the double-loop TDD cycle:
+1. **Tests first** — acceptance test (outer loop, RED) anchored to the slice's acceptance criteria, then unit tests (inner loop, RED).
 2. **Code** — minimal code to green, then refactor.
-3. **Review** — `critique-loop` review-only flow on the stage diff with slug `<slug>-stage-N`; resolve asks. This is a navigator-only review, **not** a phase gate — it has no Plannotator developer-review leg.
-4. **Proceed** — mark the stage's task done, move on.
+3. **Review** — `critique-loop` review-only flow on the slice diff with slug `<slug>-slice-N`; resolve asks. This is a navigator-only review, **not** a phase gate — it has no Plannotator developer-review leg.
+4. **Proceed** — tick the slice's acceptance-criteria boxes in `plan.md`, mark the task done, move on.
 
-After the final stage, run one `critique-loop` review of the whole feature diff with slug `<slug>-final`. Handle its verdict exactly as the flowchart dictates — resolve `CHANGES_REQUESTED`, surface `BLOCK`. On APPROVE, produce a summary report: the feature branch is then ready for the developer to open a PR or merge. Opening and merging the PR is out of scope — see `babysit-pr`.
+After the final slice, run one `critique-loop` review of the whole feature diff with slug `<slug>-final`. Handle its verdict exactly as the flowchart dictates — resolve `CHANGES_REQUESTED`, surface `BLOCK`. On APPROVE, produce a summary report: the feature branch is then ready for the developer to open a PR or merge. Opening and merging the PR is out of scope — see `babysit-pr`.
 
 ## Gate-decision flowchart
 
@@ -100,7 +132,7 @@ The APPROVE path never goes straight to "advance" — it always passes through P
 | "The navigator already signed off." | Navigator review and developer approval are two separate, both-required gates. One does not satisfy the other. |
 | "We're behind schedule — don't wait." | Gates are how you stay fast. The developer gate is the cheaper half; skipping it risks a full rework loop later. It is NOT an invented extra review cycle — it is part of the defined process. |
 | "The code is already worked out in my head." | Tests-first defines what the code *should* do; writing code first lets tests describe what it *does*. Write the tests first. |
-| "It's the same file — might as well do stage 4 now." | Scope is fixed by the approved design. Note the observation, defer it, stay scoped to the current stage. |
+| "It's the same file — might as well do slice 4 now." | Scope is fixed by the approved plan. Note the observation, defer it, stay scoped to the current slice. |
 | "I'll just confirm the artifact in chat." | The developer-review gate runs through `plannotator annotate` on the artifact. An inline chat message is not the gate. |
 
 ## Red flags — STOP
@@ -109,7 +141,7 @@ If you catch yourself thinking any of these, a gate is about to be skipped:
 
 - "The navigator signed off, so I can advance." → STOP. Open the artifact in Plannotator and wait for explicit developer approval.
 - "I'll add tests after the code." → STOP. Write the failing tests first.
-- "While I'm in here I'll also…" → STOP. Note it, defer it, stay scoped to the current stage.
+- "While I'm in here I'll also…" → STOP. Note it, defer it, stay scoped to the current slice.
 - "I'll just confirm in chat." → STOP. Run `plannotator annotate` on the artifact.
 - "Don't wait on anything else." → STOP. The developer gate is part of the process, not a delay.
 
@@ -118,8 +150,9 @@ If you catch yourself thinking any of these, a gate is about to be skipped:
 ```
 docs/features/<slug>/
   scenarios.md                      # Phase 1
-  prd.md                            # Phase 2 — includes ## Domain Terms (and ## Aliased Terms when redefining)
-  design.md                         # Phase 4
+  prd.md                            # Phase 2 — Stakeholders, Quality Targets, Constraints, Domain Terms (+ Aliased Terms when redefining)
+  design.md                         # Phase 4 — System Analysis, Components, Integration & Data Ownership, Risks
+  plan.md                           # Phase 6 — vertical-slice tracer bullets with AFK/HITL, acceptance criteria
   diagrams/architecture.d2          # current + proposed states in one file
   diagrams/architecture-current.svg
   diagrams/architecture-proposed.svg
@@ -138,8 +171,9 @@ Commit artifacts with `docs:` conventional commits. ADRs created in Phase 4 are 
 |---|---|
 | Phase 3 — product (scenarios + PRD) review | `<slug>-product` |
 | Phase 5 — design (and any new ADRs) review | `<slug>-design` |
-| Phase 6 — stage N review | `<slug>-stage-N` |
-| Phase 6 — final whole-diff review | `<slug>-final` |
+| Phase 7 — plan review | `<slug>-plan` |
+| Phase 8 — slice N review | `<slug>-slice-N` |
+| Phase 8 — final whole-diff review | `<slug>-final` |
 
 Each slug gets its own `critique-loop` session, so reviews stay independent and their artifacts do not collide.
 
@@ -149,4 +183,4 @@ Run `d2 --version`. If present, render each `.d2` to `.svg`. If missing, offer `
 
 ## Escalation
 
-If the design's stage breakdown has **5 or more stages**, dispatch each stage to its own fresh subagent to keep the main context lean.
+If `plan.md` has **5 or more slices**, dispatch each slice to its own fresh subagent in Phase 8 to keep the main context lean.

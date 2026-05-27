@@ -46,7 +46,20 @@ A PRD that breaks one of these is defective; fix it before the gate.
    silence.
 7. **No implementation walk-through.** The PRD captures *decisions*, not the
    order in which the code will be written. Implementation sequencing belongs
-   in the design's stage breakdown, not here.
+   in `plan.md` (Phase 6), not here.
+8. **Quality Targets must be numeric.** "Fast", "scalable", "secure" without
+   numbers are smells. Each non-functional requirement gets a measurable target
+   — latency percentile, RPS, data volume, availability percentage, durability
+   class. Tied to a scenario where it makes sense. If a target is unknown but
+   load-bearing, list it in Open Questions, do not guess.
+9. **Constraints are named and explicit.** Tech stack lock-in, deadlines,
+   regulatory rails, budget, team capacity. Every reviewer must be able to
+   judge "does the proposal respect these rails?" — implicit constraints are
+   the ones that get violated.
+10. **Stakeholders Consulted is honest.** One line per voice that actually
+    shaped the PRD. "Primary developer (solo)" is valid; pretending broader
+    consultation happened when it didn't is not. The list tells the reviewer
+    whose perspective is — and isn't — in the doc.
 
 ## Recommendations — apply with judgment
 
@@ -81,6 +94,40 @@ The problem from the user's perspective. One or two paragraphs.
 
 The solution from the user's perspective. One or two paragraphs. What the user
 can now do that they could not before.
+
+## Stakeholders Consulted
+
+- Primary developer (solo)  *(or: product, security, support, adjacent team X, etc.)*
+
+(One line per voice that shaped this PRD. Honest about whose perspective is in
+it. "Primary developer (solo)" is valid.)
+
+## Quality Targets
+
+Numeric targets per non-functional requirement. Each ties (where applicable) to
+a scenario in `scenarios.md`.
+
+| Quality | Target | Verified by |
+|---|---|---|
+| Latency | p95 < 300 ms for the checkout scenario at expected load | Scenario 3 |
+| Throughput | sustain 200 RPS for 10 minutes | load test alongside Scenario 3 |
+| Availability | 99.5% over a rolling 30-day window | platform SLO |
+| Data volume | up to 50 MB per order | — |
+| Durability | no committed order is lost across a node restart | Scenario 7 |
+
+(Omit rows that don't apply. Add new rows when the feature has a real target.
+"Fast / scalable / secure" with no number is forbidden.)
+
+## Constraints
+
+- **Stack** — must run on the existing service's Node.js 20 + Postgres 16; no new database.
+- **Deadline** — first slice in production by *YYYY-MM-DD* (regulatory deadline).
+- **Regulatory** — PII handling follows the existing GDPR processor agreement; no new sub-processors.
+- **Budget** — no new external paid services.
+- **Team** — one engineer for the next sprint; no design partner.
+
+(List only the constraints that actually bind this feature. Each is a rail the
+design must respect; reviewers test the proposal against this list at the gate.)
 
 ## Domain Terms
 
@@ -185,7 +232,10 @@ term, you must explain why in this section, not in prose elsewhere.
 | Re-interviewing in Phase 2 | Phase 1 already gathered the facts; restarting discovery means the PRD is replacing scenarios, not synthesizing them | Synthesize from context; surface gaps as Open Questions |
 | User stories without scenario backing | A story no scenario verifies cannot be implemented or accepted | Add the scenario or drop the story |
 | File paths and code snippets in the PRD | They go stale fast; tie the PRD to a specific implementation it should not constrain | Talk about modules and contracts in prose; use snippets only for prototype-derived decision shapes |
-| Implementation walk-through dressed as decisions | A step-by-step plan is a stage breakdown — that lives in the design | Capture decisions only; sequencing belongs in `design.md` |
+| Implementation walk-through dressed as decisions | A step-by-step plan is a vertical-slice breakdown — that lives in `plan.md` (Phase 6) | Capture decisions only; sequencing belongs in `plan.md` |
+| Vague Quality Targets ("fast", "scalable", "secure") | A reviewer cannot judge if the design meets the target; "fast" passes everything and nothing | Replace adjectives with numbers — p95 latency, RPS, %, MB, etc. — tied to scenarios where applicable |
+| Missing Constraints | Reviewer doesn't know which rails the design must respect; constraint violations land at the gate or later | List every rail that actually binds — stack, deadline, regulatory, budget, team capacity |
+| Dishonest Stakeholders list | Pretends broader consultation than happened; reviewer assumes voices that weren't in the room | "Primary developer (solo)" is valid; only list voices that actually shaped the PRD |
 | Domain Terms missing or hidden in prose | The rest of the feature speaks a different language than the PRD | Define every domain term in the Domain Terms section |
 | Silent term overload | Two PRDs use the same word for different concepts and a future reader cannot tell | List the change in Aliased Terms with the prior PRD's path |
 | Fuzzy vocabulary ("account", "user", "thing") | The reviewer cannot tell what the feature actually does | Pick one canonical term per concept; put the rest in `_Avoid_:` |
