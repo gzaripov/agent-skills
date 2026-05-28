@@ -72,6 +72,24 @@ A scenario that breaks one of these is defective; fix it before the gate.
 7. **Each scenario stands alone.** It is understandable by someone who has never
    seen the feature, depends on no other scenario's leftover state, and passes in
    any order.
+8. **Wrap every `Feature` in a fenced ```` ```gherkin ```` code block.** Plain
+   indented Gherkin renders as collapsed prose in markdown viewers and review
+   tools — the reviewer literally cannot see `Given`/`When`/`Then` structure on
+   the rendered page. The fence preserves indentation and turns on Gherkin
+   syntax highlighting. See *Writing the Gherkin* below.
+9. **Lead with user-flow `Scenario:` blocks; reach for `Rule:` only when a
+   user walkthrough doesn't fit.** A `Scenario:` is *how a user interacts with
+   the feature* — a concrete walkthrough they could narrate. A `Rule:` is a
+   *property of the system* — something that holds true and may not have a
+   single user-flow representative. Order the `Feature:` body with user-flow
+   `Scenario:` blocks first; then, only for invariants that don't lend
+   themselves to a single user walkthrough (system contracts, durability
+   properties, scale checks, exit-path gates), add `Rule:` blocks with
+   `Example:` blocks underneath. Don't try to make everything a `Rule:`; don't
+   try to make everything a `Scenario:`. A title like "X is forbidden", "Y is
+   required", or "Z survives a restart" is usually a `Rule:`; a title like
+   "the user does X and then Y" is usually a `Scenario:`. See
+   *Writing the Gherkin* below.
 
 ## Recommendations — apply with judgment
 
@@ -95,6 +113,67 @@ A scenario that breaks one of these is defective; fix it before the gate.
 A `Feature` opens with its **product reason** — who it serves and *why* it matters
 (Rule 1) — then `Scenario` blocks of `Given` / `When` / `Then`. Extra `And` lines
 are fine for setup or compound outcomes; a second `When` means a second scenario.
+
+Always wrap the whole `Feature` (product-reason paragraph and every `Scenario`)
+in a single fenced ```` ```gherkin ```` block (Rule 8). One block per `Feature`
+is the default; do not interleave Gherkin and prose inside one block, and do not
+leave Gherkin unfenced.
+
+### Scenarios first, Rules second (Rule 9)
+
+Order the body of a `Feature:` block with the user-flow `Scenario:` blocks
+first, then the `Rule:` blocks for invariants that don't fit a single user
+walkthrough. The reviewer should be able to read the user flows top-to-bottom
+and recover the product story; the `Rule:` blocks at the bottom answer
+"and what does the system *always* guarantee" questions that the flow
+scenarios don't directly demonstrate.
+
+A `Rule:` block is not required when the `Feature` is a sequence of related
+user flows that don't share a common invariant — a flat list of `Scenario:`
+blocks is fine in that case. Reach for `Rule:` when (a) one of your candidate
+scenarios reads like a system property rather than a walkthrough, (b) several
+scenarios are demonstrating the same constraint, or (c) the invariant covers
+something the user never directly triggers (durability across restart, scale
+limits, exit-path gates).
+
+```gherkin
+Feature: Gift card checkout
+
+  ...product reason...
+
+  Scenario: A shopper pays for an order with a gift card
+    Given a shopper with a gift card worth 50 USD
+    And a cart totalling 40 USD
+    When the shopper pays with the gift card
+    Then the order is confirmed
+    And the remaining gift card balance is 10 USD
+
+  Scenario: A shopper sees a top-up prompt when the gift card is short
+    Given a shopper with a gift card worth 30 USD
+    And a cart totalling 40 USD
+    When the shopper pays with the gift card
+    Then the shopper is asked to cover the remaining 10 USD
+
+  Rule: A gift card balance cannot go negative
+
+    Example: A balance of zero rejects a further charge
+      Given a shopper with a gift card worth 0 USD
+      When the shopper tries to pay with the gift card
+      Then the gift card is declined
+      And the gift card balance is still 0 USD
+
+  Rule: A confirmed order survives a service restart
+
+    Example: Order remains confirmed after restart
+      Given a confirmed order paid with a gift card
+      When the order service restarts
+      Then the order is still confirmed
+      And the gift card balance is unchanged
+```
+
+Notice the order: the user-flow `Scenario:` blocks come first, then the
+`Rule:` blocks for properties (no negative balance, durability) that don't
+map cleanly to one user walkthrough.
 
 ```gherkin
 Feature: Gift card checkout
@@ -151,6 +230,9 @@ Scenario: A valid discount code reduces the order total
 | Scripting instead of specifying | A click-by-click walkthrough, not an example of behavior | Rewrite as *what* outcome, not *what sequence* |
 | Order-dependent scenarios | Scenario B passes only if A ran first | Each scenario sets up its own state |
 | "Test X" titles | The title names a mechanic, not a rule | Title the behavior being illustrated |
+| Unfenced Gherkin in `scenarios.md` | Markdown renderers collapse the indentation and the reviewer sees a wall of prose, not steps | Wrap every `Feature` in a fenced ```` ```gherkin ```` block (Rule 8) |
+| `Scenario:` block that reads like a system property ("X is forbidden", "Y survives a restart") | Conflates a user-perspective walkthrough with an invariant; the reviewer cannot tell whether one passing example is enough | Hoist the property to a `Rule:` block and put `Example:` blocks under it that demonstrate the rule (Rule 9) |
+| `Rule:` blocks for everything; no plain `Scenario:` left | The product story disappears under a wall of invariants; reviewer can't read the user flows top-to-bottom | Lead with user-flow `Scenario:` blocks, then use `Rule:` only for properties that don't fit one walkthrough (Rule 9) |
 
 ## "How it lands in the product"
 
