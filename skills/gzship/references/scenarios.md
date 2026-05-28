@@ -77,6 +77,15 @@ A scenario that breaks one of these is defective; fix it before the gate.
    tools — the reviewer literally cannot see `Given`/`When`/`Then` structure on
    the rendered page. The fence preserves indentation and turns on Gherkin
    syntax highlighting. See *Writing the Gherkin* below.
+9. **System invariants are `Rule:` blocks, not standalone `Scenario:` blocks.**
+   A `Scenario:` (or `Example:`) is a *single concrete user-perspective walk-
+   through* of the system. A constraint the system always satisfies — "Plan
+   Mode never mutates pipeline state", "an Order cannot ship before payment" —
+   is a **Rule**, not a scenario. Group such invariants under a `Rule:` block
+   and put one or more `Example:` blocks inside that demonstrate the rule. A
+   scenario titled like a system property ("X is forbidden", "Y is required",
+   "Z survives a restart") is almost always a Rule waiting to be hoisted.
+   See *Writing the Gherkin* below.
 
 ## Recommendations — apply with judgment
 
@@ -105,6 +114,47 @@ Always wrap the whole `Feature` (product-reason paragraph and every `Scenario`)
 in a single fenced ```` ```gherkin ```` block (Rule 8). One block per `Feature`
 is the default; do not interleave Gherkin and prose inside one block, and do not
 leave Gherkin unfenced.
+
+### Rules vs. Scenarios (Rule 9)
+
+Gherkin 6+ supports a `Rule:` keyword that groups one or more `Example:` (the
+modern synonym for `Scenario:`) blocks under a single invariant. Use it when
+the thing you would otherwise call a scenario is actually a *property of the
+system*, and pair it with one or more `Example:` blocks that show the property
+in action from a user's perspective:
+
+```gherkin
+Feature: Gift card checkout
+
+  ...product reason...
+
+  Rule: A gift card balance cannot go negative
+
+    Example: Gift card covers the full order
+      Given a shopper with a gift card worth 50 USD
+      And a cart totalling 40 USD
+      When the shopper pays with the gift card
+      Then the order is confirmed
+      And the remaining gift card balance is 10 USD
+
+    Example: Gift card does not cover the order
+      Given a shopper with a gift card worth 30 USD
+      And a cart totalling 40 USD
+      When the shopper pays with the gift card
+      Then the shopper is asked to cover the remaining 10 USD
+
+  Rule: Refunds restore the gift card balance
+
+    Example: Refund credits the original gift card
+      ...
+```
+
+A `Rule:` block is not required when the `Feature` is a sequence of related
+user flows that don't share a common invariant — a flat list of `Scenario:`
+blocks is fine in that case. Reach for `Rule:` when (a) one of your scenarios
+reads like a system property rather than a walkthrough, or (b) several
+scenarios are demonstrating the same constraint and the title of each starts
+with the same noun phrase.
 
 ```gherkin
 Feature: Gift card checkout
@@ -162,6 +212,7 @@ Scenario: A valid discount code reduces the order total
 | Order-dependent scenarios | Scenario B passes only if A ran first | Each scenario sets up its own state |
 | "Test X" titles | The title names a mechanic, not a rule | Title the behavior being illustrated |
 | Unfenced Gherkin in `scenarios.md` | Markdown renderers collapse the indentation and the reviewer sees a wall of prose, not steps | Wrap every `Feature` in a fenced ```` ```gherkin ```` block (Rule 8) |
+| `Scenario:` block that reads like a system property ("X is forbidden", "Y survives a restart") | Conflates a user-perspective walkthrough with an invariant; the reviewer cannot tell whether one passing example is enough | Hoist the property to a `Rule:` block and put `Example:` blocks under it that demonstrate the rule (Rule 9) |
 
 ## "How it lands in the product"
 
