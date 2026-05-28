@@ -72,6 +72,11 @@ A scenario that breaks one of these is defective; fix it before the gate.
 7. **Each scenario stands alone.** It is understandable by someone who has never
    seen the feature, depends on no other scenario's leftover state, and passes in
    any order.
+8. **Wrap every `Feature` in a fenced ```` ```gherkin ```` code block.** Plain
+   indented Gherkin renders as collapsed prose in markdown viewers and review
+   tools — the reviewer literally cannot see `Given`/`When`/`Then` structure on
+   the rendered page. The fence preserves indentation and turns on Gherkin
+   syntax highlighting. See *Writing the Gherkin* below.
 
 ## Recommendations — apply with judgment
 
@@ -95,6 +100,11 @@ A scenario that breaks one of these is defective; fix it before the gate.
 A `Feature` opens with its **product reason** — who it serves and *why* it matters
 (Rule 1) — then `Scenario` blocks of `Given` / `When` / `Then`. Extra `And` lines
 are fine for setup or compound outcomes; a second `When` means a second scenario.
+
+Always wrap the whole `Feature` (product-reason paragraph and every `Scenario`)
+in a single fenced ```` ```gherkin ```` block (Rule 8). One block per `Feature`
+is the default; do not interleave Gherkin and prose inside one block, and do not
+leave Gherkin unfenced.
 
 ```gherkin
 Feature: Gift card checkout
@@ -151,6 +161,7 @@ Scenario: A valid discount code reduces the order total
 | Scripting instead of specifying | A click-by-click walkthrough, not an example of behavior | Rewrite as *what* outcome, not *what sequence* |
 | Order-dependent scenarios | Scenario B passes only if A ran first | Each scenario sets up its own state |
 | "Test X" titles | The title names a mechanic, not a rule | Title the behavior being illustrated |
+| Unfenced Gherkin in `scenarios.md` | Markdown renderers collapse the indentation and the reviewer sees a wall of prose, not steps | Wrap every `Feature` in a fenced ```` ```gherkin ```` block (Rule 8) |
 
 ## "How it lands in the product"
 
