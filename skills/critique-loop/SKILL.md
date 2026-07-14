@@ -416,7 +416,7 @@ The branch is ready for the user to open a PR or merge. PR / merge / push are ou
 Bail and ask the user when:
 
 - The navigator returns the same ask in 3 rounds in a row with no sign of converging — your revisions aren't landing; something is miscommunicated.
-- Round counter hits 5 in either phase without an APPROVE — at that point escalating is cheaper than iterating.
+- Round counter hits 10 in either phase without an APPROVE — at that point escalating is cheaper than iterating.
 - Navigator output missing `VERDICT:` twice in a row — the contract isn't holding; surface the raw output.
 - The navigator CLI fails (auth expired, network, CLI crash) — report the exact error; do not retry blindly. Do not silently switch to the other navigator CLI to dodge the failure.
 - The session-id file is missing or empty after the first call — the first session didn't record properly; do not try to resume.
