@@ -1,0 +1,21 @@
+{
+  "name": "agent-skills",
+  "owner": {
+    "name": "Grigory Zaripov"
+  },
+  "metadata": {
+    "description": "OMP-native variants of the agent-skills workflows"
+  },
+  "plugins": [
+    {
+      "name": "critique-loop",
+      "description": "OMP-native cross-model critique loop with a persistent read-only navigator subagent",
+      "source": "./plugins/critique-loop-omp",
+      "category": "development",
+      "tags": [
+        "code-review",
+        "planning"
+      ]
+    }
+  ]
+}
