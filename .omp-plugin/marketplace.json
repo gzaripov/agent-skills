@@ -10,6 +10,7 @@
     {
       "name": "critique-loop",
       "description": "OMP-native cross-model critique loop with a persistent read-only navigator subagent",
+      "version": "1.0.0",
       "source": "./plugins/critique-loop-omp",
       "category": "development",
       "tags": [
