@@ -27,6 +27,8 @@ Session-id file: `.critique-loop/<slug>.session-id` (created on first call, reus
 
 The skill body below refers to two abstract operations: **START-SESSION** (first call, creates the session) and **RESUME-SESSION** (every follow-up call). Each navigator below supplies both, plus its session-id-capture strategy. Pick one set based on the `Navigator CLI` value above.
 
+**Session reuse is mandatory.** Before any **START-SESSION**, look for `.critique-loop/<slug>.session-id`. If a non-empty ID belongs to the same task/slug and the selected CLI can resume it, use **RESUME-SESSION** instead and never overwrite it. This applies across plan review, re-reviews, implementation, code review, review-only follow-ups, and a later skill invocation that returns to the same work. Preserving the conversation carries decisions and prior asks forward, avoids repeated discovery, and may reduce duplicate token use. Start a new chat only for a different task or an unrecoverable session ID.
+
 All navigators accept the same inputs:
 - `<PROMPT>` — the prompt text (passed via a heredoc in the actual steps).
 - `<OUTPUT_FILE>` — where the navigator's review is written.
@@ -109,6 +111,7 @@ cursor-agent -p --trust \
 
 After either START-SESSION, verify `.critique-loop/<SLUG>.session-id` is non-empty before continuing. If empty, surface the raw output to the user and stop.
 
+
 ## Prerequisites
 
 - Navigator CLI is installed and authenticated:
@@ -171,9 +174,9 @@ Skip this step in ephemeral mode — the plan is gitignored working state.
 
 ## Phase 2: Navigator reviews the plan
 
-### Step 4: First call (creates the session)
+### Step 4: First review call
 
-Run **START-SESSION** from the navigator adapter (see Configuration) with:
+Apply the session-reuse invariant, then run **START-SESSION** only if this task has no usable session ID; otherwise run **RESUME-SESSION**. Use:
 
 - `<SLUG>` = the task slug
 - `<OUTPUT_FILE>` = `.critique-loop/<slug>-plan-review.md`
@@ -418,8 +421,8 @@ Bail and ask the user when:
 - The navigator returns the same ask in 3 rounds in a row with no sign of converging — your revisions aren't landing; something is miscommunicated.
 - Round counter hits 5 in either phase without an APPROVE — at that point escalating is cheaper than iterating.
 - Navigator output missing `VERDICT:` twice in a row — the contract isn't holding; surface the raw output.
-- The navigator CLI fails (auth expired, network, CLI crash) — report the exact error; do not retry blindly. Do not silently switch to the other navigator CLI to dodge the failure.
-- The session-id file is missing or empty after the first call — the first session didn't record properly; do not try to resume.
+- The navigator CLI fails (auth expired, network, crash) — report the exact error; do not retry blindly. Do not silently switch to the other navigator CLI to dodge the failure.
+- The session-id file is missing or empty after the first call — the first session did not record properly; do not try to resume.
 - The user's answer to a surfaced question is itself ambiguous — re-ask before resuming the navigator.
 - During Phase 3, the lint/test suite fails in a way that requires judgement outside the plan (flaky infra, unrelated breakage, architectural conflict) — don't silently rewrite the plan to dodge it.
 
@@ -462,7 +465,7 @@ Record whichever was chosen in the `review-range` file.
 
 ### Review-only Step R3: Navigator reviews the diff
 
-Run **START-SESSION** from the navigator adapter with:
+Apply the session-reuse invariant, then run **START-SESSION** only if this task has no usable session ID; otherwise run **RESUME-SESSION**. Use:
 
 - `<SLUG>` = the task slug
 - `<OUTPUT_FILE>` = `.critique-loop/<slug>-code-review.md`
