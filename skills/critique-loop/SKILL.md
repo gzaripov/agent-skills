@@ -1,8 +1,8 @@
 ---
 name: critique-loop
-description: Cross-model critique loop with two entry points. Full flow — plan → navigator reviews plan → user approves → implement → navigator reviews diff. Review-only flow — navigator adversarially reviews an existing diff; no plan, no implementation. Same navigator session across rounds so it retains context. Navigator is pluggable — Codex CLI (default, gpt-5.5 at xhigh effort) or Cursor CLI (gpt-5.3-codex-xhigh). Claude resolves code-level asks itself; product/architecture questions are surfaced to the user, then the same session resumes with the answer.
+description: Cross-model critique loop with two entry points. Full flow — plan → navigator reviews plan → user approves → implement → navigator reviews diff. Review-only flow — navigator adversarially reviews an existing diff; no plan, no implementation. Same navigator session across rounds so it retains context. Navigator is pluggable — Codex CLI (default, gpt-5.5 at xhigh effort), Cursor CLI (gpt-5.3-codex-xhigh), or an OMP subagent (gpt-5.5 at xhigh via the task tool — no external CLI; OMP host only). Claude resolves code-level asks itself; product/architecture questions are surfaced to the user, then the same session resumes with the answer.
 license: MIT
-compatibility: Requires either Codex CLI (`codex`, authenticated with `codex login`) or Cursor CLI (`cursor-agent`, authenticated with `cursor-agent login`). Run from inside a git repository, on a feature branch (not `main`/`master`).
+compatibility: Requires one navigator backend — Codex CLI (`codex`, authenticated with `codex login`), Cursor CLI (`cursor-agent`, authenticated with `cursor-agent login`), or an OMP host with an OpenAI-family model available (`omp-subagent` adapter; no external CLI). Run from inside a git repository, on a feature branch (not `main`/`master`).
 allowed-tools: Bash(codex exec *) Bash(codex exec resume *) Bash(cursor-agent *) Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git rev-parse *) Bash(git branch --show-current) Bash(mkdir -p .critique-loop) Bash(cat .critique-loop/*) Bash(grep -oE *) Bash(tee .critique-loop/*)
 ---
 
@@ -15,17 +15,19 @@ Use this skill when the user wants an adversarial cross-model review. Two flows:
 
 Defaults live here — edit to override. Everything below reads from these.
 
-- **Navigator CLI:** `codex` (options: `codex` | `cursor`)
+- **Navigator CLI:** `codex` (options: `codex` | `cursor` | `omp-subagent`)
 - **Artifact directory:** `.critique-loop/` — **local working state only, gitignored**. Not committed; not part of the PR. Add to `.gitignore` on first run (Step 1).
 - **Slug:** current git branch name, or a kebab-case identifier derived from the task if on `main`/`master`
 - **Plan file path:** `.critique-loop/<slug>-plan.md` (default — **ephemeral mode**, lives under the gitignored artifact directory, never committed).
   Override to a repo path like `docs/plans/<slug>.md` to use **repo mode** — the plan becomes a first-class committed design doc (skill commits the initial file and each revision as `docs: plan for <slug>` / `docs: revise plan for <slug> (round N)`). Pick repo mode when you want the plan reviewable as part of the PR; pick ephemeral mode when the plan is just scratch for the navigator loop.
 
-Session-id file: `.critique-loop/<slug>.session-id` (created on first call, reused on every resume).
+Session-id file: `.critique-loop/<slug>.session-id` (created on first call, reused on every resume). CLI adapters only — the `omp-subagent` adapter records `.critique-loop/<slug>.agent-id` instead (see its section).
 
 ### Navigator adapter
 
 The skill body below refers to two abstract operations: **START-SESSION** (first call, creates the session) and **RESUME-SESSION** (every follow-up call). Each navigator below supplies both, plus its session-id-capture strategy. Pick one set based on the `Navigator CLI` value above.
+
+**Session reuse is mandatory.** Before any **START-SESSION**, look for the adapter-specific handle (`.session-id` or `.agent-id`). If a non-empty handle belongs to the same task/slug and the backend can resume it, use **RESUME-SESSION** instead and never overwrite it. This applies across plan review, re-reviews, implementation, code review, review-only follow-ups, and a later skill invocation that returns to the same work. Preserving the conversation carries decisions and prior asks forward, avoids repeated discovery, and may reduce duplicate token use. Start a new chat only for a different task or an unrecoverable handle; when an OMP restart makes an agent unrecoverable, seed the replacement from the prior review and driver-response artifacts as described below.
 
 All navigators accept the same inputs:
 - `<PROMPT>` — the prompt text (passed via a heredoc in the actual steps).
@@ -107,13 +109,44 @@ cursor-agent -p --trust \
   > <OUTPUT_FILE>
 ```
 
-After either START-SESSION, verify `.critique-loop/<SLUG>.session-id` is non-empty before continuing. If empty, surface the raw output to the user and stop.
+After either CLI START-SESSION, verify `.critique-loop/<SLUG>.session-id` is non-empty before continuing. If empty, surface the raw output to the user and stop.
+
+#### If Navigator CLI = `omp-subagent` (OMP host only)
+
+Use when the driver is running inside OMP (Oh My Pi). The navigator is a task-tool subagent, not an external CLI: no subprocess, no session-id grepping, no stdin workarounds. Cross-model property is preserved by pinning the agent's `model:` to an OpenAI-family model.
+
+- **Agent definition:** `critique-navigator` — ships with this skill at `omp/critique-navigator.md`. Install once per project by copying it to `.omp/agents/critique-navigator.md` (or user-wide to `~/.omp/agent/agents/critique-navigator.md`).
+- **Model:** `openai-codex/gpt-5.5` at `xhigh` thinking (frontmatter `model:`/`thinkingLevel:`; edit the agent file to override). Requires that provider to be authenticated in OMP (e.g. `/login openai-codex`).
+- **Read-only:** enforced by the harness via the agent's `tools: read, grep, glob` frontmatter — stronger than a sandbox flag; the navigator has no write/exec tools at all.
+- **Session continuity:** the agent id IS the chat. Finished subagents stay revivable in OMP's registry; messaging the id resumes them with full context. Treat parked and finished agents as reusable: use `hub send`, and do not spawn a replacement while the saved id is revivable. Record the id in `.critique-loop/<SLUG>.agent-id`.
+
+**First-run install check:** if `.omp/agents/critique-navigator.md` does not exist, create `.omp/agents/` and copy the agent definition into it — the source is `omp/critique-navigator.md` next to this skill file (from OMP it also resolves as `skill://critique-loop/omp/critique-navigator.md`). Agent discovery is fresh at spawn time; no restart needed.
+
+**START-SESSION** — only when no reusable `.agent-id` exists; spawn via the `task` tool (not bash):
+
+- `agent`: `critique-navigator`
+- `name`: `CritiqueNavigator` (stable id; OMP uniquifies to `CritiqueNavigator-2` etc. if taken — record the *actual* allocated id in `.critique-loop/<SLUG>.agent-id`)
+- `task`: `<PROMPT>`, verbatim
+
+The review text is the task result (also persisted at `agent://<id>`). Write it to `<OUTPUT_FILE>` yourself so the artifact-file conventions below hold unchanged.
+
+**RESUME-SESSION** — preferred for every call after the first; message the same agent via the `hub` tool:
+
+- op `send`, `to`: the id from `.critique-loop/<SLUG>.agent-id`, `await: true`
+- `message`: `<PROMPT>`, verbatim
+
+The reply is the review; write it to `<OUTPUT_FILE>`.
+
+> **Park-transition race:** a `hub send` issued immediately after the navigator yields can fail with `Unknown agent` while the agent transitions to parked. Check the roster (`hub` op `list`), then retry the send once. Only treat it as a real failure if the retry also fails and the id is absent from `history://`.
+
+> **Process-restart limit:** revival works while the OMP process that spawned the navigator is alive (idle/parked agents are process-scoped). After an OMP restart the old id is `on disk` — not revivable. START a fresh session and include the prior round's review + driver-response file paths in the first prompt; the transcript also remains readable at `history://<old-id>`.
 
 ## Prerequisites
 
-- Navigator CLI is installed and authenticated:
+- Navigator backend is ready:
   - **Codex:** `codex --version` succeeds, `codex login` done. Smoke test: `codex exec -m gpt-5.5 --sandbox read-only "reply OK" < /dev/null` prints `OK`. (The `< /dev/null` is required; see the codex adapter note above.)
   - **Cursor:** `cursor-agent --version` succeeds, `cursor-agent login` done. Smoke test: `cursor-agent -p --trust --model gpt-5.3-codex-xhigh --mode plan "reply with exactly: OK"` prints `OK`.
+  - **OMP subagent:** driver is running in OMP; `.omp/agents/critique-navigator.md` installed (see adapter section); the agent's model resolves (`omp models find gpt-5.5` lists an available provider). Smoke test: spawn `critique-navigator` with task "reply with exactly: OK".
 - Current directory is a git repo.
 - Current branch is not `main`/`master`. If on `main`, ask the user for a branch name and slug before proceeding.
 
@@ -171,9 +204,9 @@ Skip this step in ephemeral mode — the plan is gitignored working state.
 
 ## Phase 2: Navigator reviews the plan
 
-### Step 4: First call (creates the session)
+### Step 4: First review call
 
-Run **START-SESSION** from the navigator adapter (see Configuration) with:
+Apply the session-reuse invariant, then run **START-SESSION** only if this task has no usable handle; otherwise run **RESUME-SESSION**. Use:
 
 - `<SLUG>` = the task slug
 - `<OUTPUT_FILE>` = `.critique-loop/<slug>-plan-review.md`
@@ -202,7 +235,7 @@ Output format:
 Do not write code. Do not modify files. Review only.
 ```
 
-Substitute `<slug>` and `${PLAN_FILE_PATH}` literally before passing. Verify `.critique-loop/<slug>.session-id` is non-empty before continuing.
+Substitute `<slug>` and `${PLAN_FILE_PATH}` literally before passing. Verify the adapter-specific handle (`.critique-loop/<slug>.session-id` or `.critique-loop/<slug>.agent-id`) is non-empty before continuing.
 
 ### Step 5: Read the verdict
 
@@ -418,8 +451,8 @@ Bail and ask the user when:
 - The navigator returns the same ask in 3 rounds in a row with no sign of converging — your revisions aren't landing; something is miscommunicated.
 - Round counter hits 5 in either phase without an APPROVE — at that point escalating is cheaper than iterating.
 - Navigator output missing `VERDICT:` twice in a row — the contract isn't holding; surface the raw output.
-- The navigator CLI fails (auth expired, network, CLI crash) — report the exact error; do not retry blindly. Do not silently switch to the other navigator CLI to dodge the failure.
-- The session-id file is missing or empty after the first call — the first session didn't record properly; do not try to resume.
+- The navigator backend fails (CLI: auth expired, network, crash; OMP subagent: spawn rejected, model unavailable) — report the exact error; do not retry blindly (the one sanctioned retry is the park-transition race above). Do not silently switch to another navigator backend to dodge the failure.
+- The session handle is lost after the first call (CLI: session-id file missing or empty; OMP subagent: agent id absent from the roster and from `history://`) — the first session didn't record properly; do not try to resume.
 - The user's answer to a surfaced question is itself ambiguous — re-ask before resuming the navigator.
 - During Phase 3, the lint/test suite fails in a way that requires judgement outside the plan (flaky infra, unrelated breakage, architectural conflict) — don't silently rewrite the plan to dodge it.
 
@@ -462,7 +495,7 @@ Record whichever was chosen in the `review-range` file.
 
 ### Review-only Step R3: Navigator reviews the diff
 
-Run **START-SESSION** from the navigator adapter with:
+Apply the session-reuse invariant, then run **START-SESSION** only if this task has no usable handle; otherwise run **RESUME-SESSION**. Use:
 
 - `<SLUG>` = the task slug
 - `<OUTPUT_FILE>` = `.critique-loop/<slug>-code-review.md`
